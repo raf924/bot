@@ -1,0 +1,9 @@
+syntax = "proto3";
+option go_package = "github.com/raf924/bot/api/messages";
+package command;
+
+message Command {
+  string name = 1;
+  repeated string aliases = 2;
+  string usage = 3;
+}

@@ -1,0 +1,10 @@
+syntax = "proto3";
+option go_package = "github.com/raf924/bot/api/messages";
+package user;
+
+message User {
+  string nick = 1;
+  string id = 2;
+  bool mod = 3;
+  bool admin = 4;
+}

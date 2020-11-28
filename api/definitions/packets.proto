@@ -1,0 +1,50 @@
+syntax = "proto3";
+option go_package = "github.com/raf924/bot/api/messages";
+package packets;
+
+import "user.proto";
+import "command.proto";
+import "google/protobuf/timestamp.proto";
+
+enum UserEvent {
+  JOINED = 0;
+  LEFT = 1;
+}
+
+message MessagePacket {
+  google.protobuf.Timestamp timestamp = 1;
+  string message = 2;
+  user.User user = 3;
+  bool private = 4;
+}
+
+message UserPacket {
+  google.protobuf.Timestamp timestamp = 1;
+  user.User user = 2;
+  UserEvent event = 3;
+}
+
+message CommandPacket {
+  google.protobuf.Timestamp timestamp = 1;
+  string command = 2;
+  repeated string args = 3;
+  user.User user = 4;
+  bool private = 5;
+}
+
+message BotPacket {
+  google.protobuf.Timestamp timestamp = 1;
+  string message = 2;
+  user.User recipient = 3;
+  bool private = 4;
+}
+
+message ConfirmationPacket {
+  user.User botUser = 1;
+  repeated user.User users = 2;
+}
+
+message RegistrationPacket {
+  string trigger = 1;
+  repeated command.Command commands = 2;
+}
