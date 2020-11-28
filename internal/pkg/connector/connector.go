@@ -83,30 +83,32 @@ func (c *Connector) Start() error {
 			if c.botRelay.Trigger() == "" {
 				continue
 			}
-			var isCommand = false
+			var actualCommand = ""
 			if strings.HasPrefix(mP.Message, c.botRelay.Trigger()) {
 				args := strings.Split(strings.TrimPrefix(mP.Message, c.botRelay.Trigger()), " ")
 				if len(args) > 0 && len(args[0]) > 0 {
 					command := args[0]
 					for _, cmd := range c.botRelay.Commands() {
 						if command == cmd.Name {
-							isCommand = true
+							actualCommand = cmd.Name
 							break
 						}
 						if len(cmd.Aliases) == 0 {
 							continue
 						}
+						log.Println()
 						sort.Strings(cmd.Aliases)
 						index := sort.SearchStrings(cmd.Aliases, command)
 						if index == len(cmd.Aliases) || cmd.Aliases[index] == command {
-							isCommand = true
+							log.Println("Found alias")
+							actualCommand = cmd.Name
 							break
 						}
 					}
-					if isCommand {
+					if len(actualCommand) > 0 {
 						err := c.botRelay.PassCommand(&messages.CommandPacket{
 							Timestamp: mP.Timestamp,
-							Command:   args[0],
+							Command:   actualCommand,
 							Args:      args[1:],
 							User:      mP.User,
 							Private:   mP.Private,
