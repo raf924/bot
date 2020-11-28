@@ -137,9 +137,13 @@ func (c *Connector) Start() error {
 			if packet.Timestamp == nil {
 				continue
 			}
+			recipient := ""
+			if packet.Recipient != nil {
+				recipient = packet.Recipient.Nick
+			}
 			err = c.connectionRelay.Send(relay.ChatMessage{
 				Message:   packet.Message,
-				Recipient: packet.Recipient.Nick,
+				Recipient: recipient,
 				Private:   packet.Private,
 			})
 			if err != nil {
