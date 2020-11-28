@@ -61,7 +61,7 @@ func (b *Bot) verify(command *messages.CommandPacket) (*messages.BotPacket, erro
 
 func (b *Bot) ban(command *messages.CommandPacket) (*messages.BotPacket, error) {
 	args := command.GetArgs()
-	userToBan := strings.Split(args[0], "@")[0]
+	userToBan := strings.Join(strings.Split(args[0], "@"), "")
 	duration, err := strconv.ParseInt(args[1], 10, 64)
 	if err != nil {
 		return nil, err
