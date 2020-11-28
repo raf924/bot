@@ -3,11 +3,26 @@ package bot
 import (
 	"fmt"
 	"github.com/raf924/bot/api/messages"
+	"github.com/raf924/bot/pkg/bot/command"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"strconv"
 	"strings"
 	"time"
 )
+
+type builtinCommand struct {
+	command.NoOpCommand
+	name    string
+	execute func(command *messages.CommandPacket) (*messages.BotPacket, error)
+}
+
+func (c *builtinCommand) Name() string {
+	return c.name
+}
+
+func (c *builtinCommand) Execute(command *messages.CommandPacket) (*messages.BotPacket, error) {
+	return c.execute(command)
+}
 
 func (b *Bot) verifySender(command *messages.CommandPacket) bool {
 	return b.verifyId(command.User.Id)
@@ -65,8 +80,8 @@ func (b *Bot) ban(command *messages.CommandPacket) (*messages.BotPacket, error) 
 	packet := &messages.BotPacket{
 		Timestamp: timestamppb.Now(),
 		Message:   fmt.Sprintf("@%s has been banned until %s", userToBan, banEnd),
-		Recipient: nil,
-		Private:   false,
+		Recipient: command.GetUser(),
+		Private:   command.GetPrivate(),
 	}
 	return packet, nil
 }

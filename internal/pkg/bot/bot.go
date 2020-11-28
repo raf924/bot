@@ -20,20 +20,6 @@ type ban struct {
 	duration time.Duration
 }
 
-type banCommand struct {
-	command.NoOpCommand
-	name    string
-	execute func(command *messages.CommandPacket) (*messages.BotPacket, error)
-}
-
-func (c *banCommand) Name() string {
-	return c.name
-}
-
-func (c *banCommand) Execute(command *messages.CommandPacket) (*messages.BotPacket, error) {
-	return c.execute(command)
-}
-
 type Bot struct {
 	onlineUsers              map[string]*messages.User
 	connectorRelay           relay.ConnectorRelay
@@ -64,7 +50,7 @@ func (b *Bot) Value(key interface{}) interface{} {
 }
 
 func NewBot(config bot.Config, userPermissionManager PermissionManager, commandPermissionManager PermissionManager) *Bot {
-	return &Bot{commands: make(map[string]command.Command), config: config, commandPermissionManager: commandPermissionManager, userPermissionManager: userPermissionManager, connectorRelay: relay.GetConnectorRelay(config)}
+	return &Bot{bans: make(map[string]ban), commands: make(map[string]command.Command), config: config, commandPermissionManager: commandPermissionManager, userPermissionManager: userPermissionManager, connectorRelay: relay.GetConnectorRelay(config)}
 }
 
 func (b *Bot) BotUser() *messages.User {
@@ -76,6 +62,9 @@ func (b *Bot) ApiKeys() map[string]string {
 }
 
 func (b *Bot) AddCommand(command command.Command) {
+	if _, exists := b.commands[command.Name()]; exists {
+		return
+	}
 	b.commands[command.Name()] = command
 }
 
@@ -105,9 +94,15 @@ func (b *Bot) getCommandList() []*messages.Command {
 func (b *Bot) Start() error {
 	b.ctx, b.cancelFunc = context.WithCancel(context.Background())
 	var err error
-	b.AddCommand(&banCommand{
-		name:    "ban",
-		execute: b.ban,
+	b.AddCommand(&builtinCommand{
+		NoOpCommand: command.NoOpCommand{},
+		name:        "ban",
+		execute:     b.ban,
+	})
+	b.AddCommand(&builtinCommand{
+		NoOpCommand: command.NoOpCommand{},
+		name:        "verify",
+		execute:     b.verify,
 	})
 	for _, cmd := range Commands {
 		b.AddCommand(cmd)
@@ -170,28 +165,34 @@ func (b *Bot) Start() error {
 }
 
 func (b *Bot) parseCommandPacket(packet *messages.CommandPacket) (*messages.BotPacket, error) {
-	var command command.Command
+	if b.isBanned(packet.User) {
+		return nil, nil
+	}
+	var c command.Command
 	var ok bool
-	if command, ok = b.commands[packet.Command]; ok {
+	if c, ok = b.commands[packet.Command]; ok {
 		for _, cmd := range b.commands {
 			for _, alias := range cmd.Aliases() {
 				if packet.Command == alias {
-					command = cmd
+					c = cmd
 					break
 				}
 			}
 		}
 	}
-	if command == nil {
+	if c == nil {
 		return nil, nil
 	}
-	if b.isCommandDisabled(command) {
+	if b.isCommandDisabled(c) {
 		return nil, nil
 	}
-	return command.Execute(packet)
+	return c.Execute(packet)
 }
 
 func (b *Bot) parseMessagePacket(packet *messages.MessagePacket) ([]*messages.BotPacket, error) {
+	if b.isBanned(packet.User) {
+		return nil, nil
+	}
 	var packets []*messages.BotPacket
 	for _, cmd := range b.commands {
 		if b.isCommandDisabled(cmd) {
@@ -206,4 +207,16 @@ func (b *Bot) parseMessagePacket(packet *messages.MessagePacket) ([]*messages.Bo
 		}
 	}
 	return packets, nil
+}
+
+func (b Bot) isBanned(user *messages.User) bool {
+	bn, exists := b.bans[user.Nick]
+	if !exists {
+		return false
+	}
+	if bn.duration < 0 || bn.start.Add(bn.duration).After(time.Now()) {
+		return true
+	}
+	delete(b.bans, user.Nick)
+	return false
 }
