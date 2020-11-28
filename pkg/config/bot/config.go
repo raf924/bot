@@ -11,7 +11,7 @@ type Config struct {
 		Trigger string            `yaml:"trigger"`
 		ApiKeys map[string]string `yaml:"apiKeys"`
 		Users   struct {
-			Owner       string           `yaml:"owner"`
+			AllowAll    bool             `yaml:"all"`
 			Permissions PermissionConfig `yaml:"permissions"`
 		} `yaml:"users"`
 		Commands struct {

@@ -186,6 +186,9 @@ func (b *Bot) parseCommandPacket(packet *messages.CommandPacket) (*messages.BotP
 	if b.isCommandDisabled(c) {
 		return nil, nil
 	}
+	if !b.isAllowed(c.Name(), packet.User) {
+		return nil, nil
+	}
 	return c.Execute(packet)
 }
 
@@ -209,7 +212,19 @@ func (b *Bot) parseMessagePacket(packet *messages.MessagePacket) ([]*messages.Bo
 	return packets, nil
 }
 
-func (b Bot) isBanned(user *messages.User) bool {
+func (b *Bot) isAllowed(command string, user *messages.User) bool {
+	uPermission, err := b.userPermissionManager.GetPermission(user.Id)
+	if err != nil {
+		return false
+	}
+	cPermission, err := b.commandPermissionManager.GetPermission(command)
+	if err != nil {
+		return false
+	}
+	return uPermission.Has(cPermission)
+}
+
+func (b *Bot) isBanned(user *messages.User) bool {
 	bn, exists := b.bans[user.Nick]
 	if !exists {
 		return false
