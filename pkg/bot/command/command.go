@@ -2,11 +2,14 @@ package command
 
 import (
 	"github.com/raf924/bot/api/messages"
+	"github.com/raf924/bot/pkg/bot/permissions"
 )
 
 type Executor interface {
 	BotUser() *messages.User
 	ApiKeys() map[string]string
+	OnlineUsers() map[string]messages.User
+	UserHasPermission(user *messages.User, permission permissions.Permission) bool
 }
 
 // A Command can either be triggered by its Name or Aliases with arguments or by chat events.

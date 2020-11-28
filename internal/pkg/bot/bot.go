@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/raf924/bot/api/messages"
+	_ "github.com/raf924/bot/internal/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/bot/command"
+	"github.com/raf924/bot/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/config/bot"
 	"github.com/raf924/bot/pkg/relay"
 	"log"
@@ -26,11 +28,32 @@ type Bot struct {
 	commands                 map[string]command.Command
 	config                   bot.Config
 	botUser                  *messages.User
-	userPermissionManager    PermissionManager
+	userPermissionManager    permissions.PermissionManager
 	bans                     map[string]ban
-	commandPermissionManager PermissionManager
+	commandPermissionManager permissions.PermissionManager
 	ctx                      context.Context
 	cancelFunc               context.CancelFunc
+}
+
+func (b *Bot) UserHasPermission(user *messages.User, permission permissions.Permission) bool {
+	perm, err := b.userPermissionManager.GetPermission(user.GetId())
+	if err != nil {
+		return false
+	}
+	return perm.Has(permission)
+}
+
+func (b *Bot) OnlineUsers() map[string]messages.User {
+	users := map[string]messages.User{}
+	for nick, user := range b.onlineUsers {
+		users[nick] = messages.User{
+			Nick:  user.GetNick(),
+			Id:    user.GetId(),
+			Mod:   user.GetMod(),
+			Admin: user.GetAdmin(),
+		}
+	}
+	return users
 }
 
 func (b *Bot) Deadline() (deadline time.Time, ok bool) {
@@ -49,7 +72,7 @@ func (b *Bot) Value(key interface{}) interface{} {
 	return b.ctx.Value(key)
 }
 
-func NewBot(config bot.Config, userPermissionManager PermissionManager, commandPermissionManager PermissionManager) *Bot {
+func NewBot(config bot.Config, userPermissionManager permissions.PermissionManager, commandPermissionManager permissions.PermissionManager) *Bot {
 	return &Bot{bans: make(map[string]ban), commands: make(map[string]command.Command), config: config, commandPermissionManager: commandPermissionManager, userPermissionManager: userPermissionManager, connectorRelay: relay.GetConnectorRelay(config)}
 }
 

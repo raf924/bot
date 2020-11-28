@@ -1,22 +1,33 @@
 package permissions
 
 import (
-	"github.com/raf924/bot/internal/pkg/bot"
 	botConfig "github.com/raf924/bot/pkg/config/bot"
 )
 
-type ManagerBuilder bot.ManagerBuilder
+var permissionFormats = map[string]ManagerBuilder{}
 
-type PermissionManager interface {
-	bot.PermissionManager
+type PermissionReader interface {
+	GetPermission(id string) (Permission, error)
 }
 
-func Manage(format string, builder bot.ManagerBuilder) {
-	bot.PermissionFormats[format] = builder
+type PermissionWriter interface {
+	SetPermission(id string, permission Permission) error
+}
+
+type PermissionManager interface {
+	PermissionReader
+	PermissionWriter
+}
+
+type ManagerBuilder func(location string) PermissionManager
+
+func Manage(format string, builder ManagerBuilder) {
+	println("Permission format:", format)
+	permissionFormats[format] = builder
 }
 
 func GetManager(config botConfig.PermissionConfig) PermissionManager {
-	builder, ok := bot.PermissionFormats[config.Format]
+	builder, ok := permissionFormats[config.Format]
 	if !ok {
 		return nil
 	}

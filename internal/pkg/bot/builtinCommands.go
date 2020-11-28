@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/raf924/bot/api/messages"
 	"github.com/raf924/bot/pkg/bot/command"
+	"github.com/raf924/bot/pkg/bot/permissions"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"strconv"
 	"strings"
@@ -38,7 +39,7 @@ func (b *Bot) verifyId(id string) bool {
 	if err != nil {
 		return false
 	}
-	return permission != UNKNOWN
+	return permission != permissions.UNKNOWN
 }
 
 func (b *Bot) verify(command *messages.CommandPacket) (*messages.BotPacket, error) {

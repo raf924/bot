@@ -2,14 +2,14 @@ package permissions
 
 import (
 	"encoding/json"
-	"github.com/raf924/bot/internal/pkg/bot"
+	"github.com/raf924/bot/pkg/bot/permissions"
 	"gopkg.in/yaml.v2"
 	"os"
 )
 
 func init() {
-	bot.Manage("yaml", newYamlFileManager)
-	bot.Manage("json", newJsonFileManager)
+	permissions.Manage("yaml", newYamlFileManager)
+	permissions.Manage("json", newJsonFileManager)
 }
 
 type Decoder interface {
@@ -21,32 +21,32 @@ type Encoder interface {
 }
 
 type filePermissionManager struct {
-	permissions map[string]bot.Permission
+	permissions map[string]permissions.Permission
 	encoder     Encoder
 	decoder     Decoder
 }
 
-func (f *filePermissionManager) GetPermission(id string) (bot.Permission, error) {
+func (f *filePermissionManager) GetPermission(id string) (permissions.Permission, error) {
 	p, ok := f.permissions[id]
 	if !ok {
-		return bot.UNKNOWN, nil
+		return permissions.UNKNOWN, nil
 	}
 	return p, nil
 }
 
-func (f *filePermissionManager) SetPermission(id string, permission bot.Permission) error {
+func (f *filePermissionManager) SetPermission(id string, permission permissions.Permission) error {
 	f.permissions[id] = permission
 	return f.encoder.Encode(f.permissions)
 }
 
-func newJsonFileManager(fileName string) bot.PermissionManager {
+func newJsonFileManager(fileName string) permissions.PermissionManager {
 	f, err := os.Open(fileName)
 	if err != nil {
 		return nil
 	}
 	encoder := json.NewEncoder(f)
 	decoder := json.NewDecoder(f)
-	var perms map[string]bot.Permission
+	var perms map[string]permissions.Permission
 	if err := decoder.Decode(&perms); err != nil {
 		return nil
 	}
@@ -57,14 +57,14 @@ func newJsonFileManager(fileName string) bot.PermissionManager {
 	}
 }
 
-func newYamlFileManager(fileName string) bot.PermissionManager {
+func newYamlFileManager(fileName string) permissions.PermissionManager {
 	f, err := os.Open(fileName)
 	if err != nil {
 		return nil
 	}
 	encoder := yaml.NewEncoder(f)
 	decoder := yaml.NewDecoder(f)
-	var perms map[string]bot.Permission
+	var perms map[string]permissions.Permission
 	if err := decoder.Decode(&perms); err != nil {
 		return nil
 	}
