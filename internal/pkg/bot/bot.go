@@ -159,10 +159,8 @@ func (b *Bot) Start() error {
 			var err error
 			switch message.Message.(type) {
 			case *messages.CommandPacket:
-				var packet *messages.BotPacket
 				log.Println("executing command")
-				packet, err = b.parseCommandPacket(message.Message.(*messages.CommandPacket))
-				packets = append(packets, packet)
+				packets, err = b.parseCommandPacket(message.Message.(*messages.CommandPacket))
 			case *messages.MessagePacket:
 				packets, err = b.parseMessagePacket(message.Message.(*messages.MessagePacket))
 			}
@@ -187,7 +185,7 @@ func (b *Bot) Start() error {
 	return nil
 }
 
-func (b *Bot) parseCommandPacket(packet *messages.CommandPacket) (*messages.BotPacket, error) {
+func (b *Bot) parseCommandPacket(packet *messages.CommandPacket) ([]*messages.BotPacket, error) {
 	if b.isBanned(packet.User) {
 		return nil, nil
 	}
@@ -228,9 +226,7 @@ func (b *Bot) parseMessagePacket(packet *messages.MessagePacket) ([]*messages.Bo
 		if err != nil {
 			continue
 		}
-		if response != nil {
-			packets = append(packets, response)
-		}
+		packets = append(packets, response...)
 	}
 	return packets, nil
 }

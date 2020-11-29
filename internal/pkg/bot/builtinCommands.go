@@ -14,14 +14,14 @@ import (
 type builtinCommand struct {
 	command.NoOpCommand
 	name    string
-	execute func(command *messages.CommandPacket) (*messages.BotPacket, error)
+	execute func(command *messages.CommandPacket) ([]*messages.BotPacket, error)
 }
 
 func (c *builtinCommand) Name() string {
 	return c.name
 }
 
-func (c *builtinCommand) Execute(command *messages.CommandPacket) (*messages.BotPacket, error) {
+func (c *builtinCommand) Execute(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
 	return c.execute(command)
 }
 
@@ -42,25 +42,21 @@ func (b *Bot) verifyId(id string) bool {
 	return permission != permissions.UNKNOWN
 }
 
-func (b *Bot) verify(command *messages.CommandPacket) (*messages.BotPacket, error) {
+func (b *Bot) verify(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
 	args := command.GetArgs()
 	op := args[len(args)-1]
+	packet := &messages.BotPacket{}
 	switch op {
 	case "add":
 	case "remove":
 	case "list":
 	default:
-		if len(args) == 0 {
-			b.verifySender(command)
-		} else {
-			b.verifyOther(command)
-		}
+		//TODO: verify self, verify other: create validation struct with User and Valid
 	}
-	packet := &messages.BotPacket{}
-	return packet, nil
+	return []*messages.BotPacket{packet}, nil
 }
 
-func (b *Bot) ban(command *messages.CommandPacket) (*messages.BotPacket, error) {
+func (b *Bot) ban(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
 	args := command.GetArgs()
 	userToBan := strings.Join(strings.Split(args[0], "@"), "")
 	duration, err := strconv.ParseInt(args[1], 10, 64)
@@ -84,5 +80,5 @@ func (b *Bot) ban(command *messages.CommandPacket) (*messages.BotPacket, error) 
 		Recipient: command.GetUser(),
 		Private:   command.GetPrivate(),
 	}
-	return packet, nil
+	return []*messages.BotPacket{packet}, nil
 }

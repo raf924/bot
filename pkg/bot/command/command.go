@@ -24,11 +24,11 @@ type Command interface {
 	// Aliases should return a list of command aliases (excluding the string returned by Name) to be used in command recognition
 	Aliases() []string
 	// Execute is the core function of a command. It does the work.
-	Execute(command *messages.CommandPacket) (*messages.BotPacket, error)
+	Execute(command *messages.CommandPacket) ([]*messages.BotPacket, error)
 	// OnChat should be implemented if the command needs to handle chat messages as they arrive
-	OnChat(message *messages.MessagePacket) (*messages.BotPacket, error)
+	OnChat(message *messages.MessagePacket) ([]*messages.BotPacket, error)
 	// OnUserEvent should be implemented if the command needs to handle user events
-	OnUserEvent(packet *messages.UserPacket) (*messages.BotPacket, error)
+	OnUserEvent(packet *messages.UserPacket) ([]*messages.BotPacket, error)
 	// if IgnoreSelf no message sent by the bot is send to the command
 	IgnoreSelf() bool
 }
@@ -51,15 +51,15 @@ func (n *NoOpCommand) Aliases() []string {
 	return []string{}
 }
 
-func (n *NoOpCommand) Execute(command *messages.CommandPacket) (*messages.BotPacket, error) {
+func (n *NoOpCommand) Execute(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
 	panic("implement me")
 }
 
-func (n *NoOpCommand) OnChat(message *messages.MessagePacket) (*messages.BotPacket, error) {
+func (n *NoOpCommand) OnChat(message *messages.MessagePacket) ([]*messages.BotPacket, error) {
 	return nil, nil
 }
 
-func (n *NoOpCommand) OnUserEvent(packet *messages.UserPacket) (*messages.BotPacket, error) {
+func (n *NoOpCommand) OnUserEvent(packet *messages.UserPacket) ([]*messages.BotPacket, error) {
 	return nil, nil
 }
 
