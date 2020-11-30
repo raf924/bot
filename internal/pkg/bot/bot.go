@@ -128,9 +128,6 @@ func (b *Bot) Start() error {
 		execute:     b.verify,
 	})
 	for _, cmd := range Commands {
-		b.AddCommand(cmd)
-	}
-	for _, cmd := range b.commands {
 		if b.isCommandDisabled(cmd) {
 			continue
 		}
@@ -139,6 +136,7 @@ func (b *Bot) Start() error {
 			log.Printf("couldn't init %s\n", cmd.Name())
 			b.config.Bot.Commands.Disabled[cmd.Name()] = true
 		}
+		b.AddCommand(cmd)
 	}
 	confirmation, err := b.connectorRelay.Connect(&messages.RegistrationPacket{
 		Trigger:  "!",
@@ -159,7 +157,6 @@ func (b *Bot) Start() error {
 			var err error
 			switch message.Message.(type) {
 			case *messages.CommandPacket:
-				log.Println("executing command")
 				packets, err = b.parseCommandPacket(message.Message.(*messages.CommandPacket))
 			case *messages.MessagePacket:
 				packets, err = b.parseMessagePacket(message.Message.(*messages.MessagePacket))
@@ -171,12 +168,10 @@ func (b *Bot) Start() error {
 				if packet == nil {
 					continue
 				}
-				log.Println("sending result")
 				relayError = b.connectorRelay.Send(packet)
 				if relayError != nil {
 					break
 				}
-				log.Println("result sent")
 			}
 		}
 		log.Println("error", relayError.Error())
@@ -186,15 +181,16 @@ func (b *Bot) Start() error {
 }
 
 func (b *Bot) parseCommandPacket(packet *messages.CommandPacket) ([]*messages.BotPacket, error) {
-	if b.isBanned(packet.User) {
+	log.Println("Parsing", packet.GetCommand(), packet.GetArgs())
+	if b.isBanned(packet.GetUser()) {
 		return nil, nil
 	}
 	var c command.Command
 	var ok bool
-	if c, ok = b.commands[packet.Command]; ok {
+	if c, ok = b.commands[packet.GetCommand()]; ok {
 		for _, cmd := range b.commands {
 			for _, alias := range cmd.Aliases() {
-				if packet.Command == alias {
+				if packet.GetCommand() == alias {
 					c = cmd
 					break
 				}
@@ -204,12 +200,15 @@ func (b *Bot) parseCommandPacket(packet *messages.CommandPacket) ([]*messages.Bo
 	if c == nil {
 		return nil, nil
 	}
+	log.Println("Command", c.Name())
 	if b.isCommandDisabled(c) {
 		return nil, nil
 	}
-	if !b.isAllowed(c.Name(), packet.User) {
+	log.Println("is not disabled")
+	if !b.isAllowed(c.Name(), packet.GetUser()) {
 		return nil, nil
 	}
+	log.Println("is allowed")
 	return c.Execute(packet)
 }
 

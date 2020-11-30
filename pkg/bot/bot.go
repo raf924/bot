@@ -6,6 +6,7 @@ import (
 	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
 	botConfig "github.com/raf924/bot/pkg/config/bot"
+	"log"
 )
 
 type IBot interface {
@@ -14,6 +15,7 @@ type IBot interface {
 }
 
 func HandleCommand(command command.Command) {
+	log.Println("Handling", command.Name())
 	bot.Commands = append(bot.Commands, command)
 }
 

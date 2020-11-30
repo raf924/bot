@@ -64,7 +64,7 @@ func (c *Connector) Start() error {
 	}
 	//TODO: somthing better
 	for _, user := range c.connectionRelay.GetUsers() {
-		if user.Nick == c.config.Connector.Name {
+		if user.GetNick() == c.config.Connector.Name {
 			err = c.botRelay.Start(user)
 			break
 		}
@@ -79,39 +79,42 @@ func (c *Connector) Start() error {
 				c.cancelFunc()
 				return
 			}
-			log.Printf("%s: %s\n", mP.User.Nick, mP.Message)
+			log.Printf("Message from %s: %s\n", mP.GetUser().GetNick(), mP.GetMessage())
 			if c.botRelay.Trigger() == "" {
 				continue
 			}
 			var actualCommand = ""
-			if strings.HasPrefix(mP.Message, c.botRelay.Trigger()) {
+			if strings.HasPrefix(mP.GetMessage(), c.botRelay.Trigger()) {
 				args := strings.Split(strings.TrimPrefix(mP.Message, c.botRelay.Trigger()), " ")
 				if len(args) > 0 && len(args[0]) > 0 {
 					command := args[0]
+					log.Println("Command", command)
 					for _, cmd := range c.botRelay.Commands() {
-						if command == cmd.Name {
-							actualCommand = cmd.Name
+						if command == cmd.GetName() {
+							log.Println("Found command", command, cmd.GetName())
+							actualCommand = cmd.GetName()
 							break
 						}
-						if len(cmd.Aliases) == 0 {
+						aliases := cmd.GetAliases()
+						if len(aliases) == 0 {
 							continue
 						}
-						log.Println()
-						sort.Strings(cmd.Aliases)
-						index := sort.SearchStrings(cmd.Aliases, command)
-						if index == len(cmd.Aliases) || cmd.Aliases[index] == command {
+						sort.Strings(aliases)
+						index := sort.SearchStrings(aliases, command)
+						if index < len(aliases) && aliases[index] == command {
 							log.Println("Found alias")
-							actualCommand = cmd.Name
+							actualCommand = cmd.GetName()
 							break
 						}
 					}
+					log.Println("Passing", actualCommand)
 					if len(actualCommand) > 0 {
 						err := c.botRelay.PassCommand(&messages.CommandPacket{
-							Timestamp: mP.Timestamp,
+							Timestamp: mP.GetTimestamp(),
 							Command:   actualCommand,
 							Args:      args[1:],
-							User:      mP.User,
-							Private:   mP.Private,
+							User:      mP.GetUser(),
+							Private:   mP.GetPrivate(),
 						})
 						if err != nil {
 							log.Println(err)

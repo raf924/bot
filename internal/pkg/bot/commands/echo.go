@@ -2,16 +2,11 @@ package commands
 
 import (
 	"github.com/raf924/bot/api/messages"
-	"github.com/raf924/bot/pkg/bot"
 	"github.com/raf924/bot/pkg/bot/command"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"strings"
 	"time"
 )
-
-func init() {
-	bot.HandleCommand(&EchoCommand{})
-}
 
 type EchoCommand struct {
 	command.NoOpCommand
