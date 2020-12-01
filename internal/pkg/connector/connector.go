@@ -62,10 +62,10 @@ func (c *Connector) Start() error {
 	if err != nil {
 		return err
 	}
-	//TODO: somthing better
+	//TODO: something better
 	for _, user := range c.connectionRelay.GetUsers() {
 		if user.GetNick() == c.config.Connector.Name {
-			err = c.botRelay.Start(user)
+			err = c.botRelay.Start(user, c.connectionRelay.GetUsers())
 			break
 		}
 	}

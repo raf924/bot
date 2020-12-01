@@ -7,6 +7,7 @@ import (
 	"github.com/raf924/bot/pkg/bot/permissions"
 	botConfig "github.com/raf924/bot/pkg/config/bot"
 	"log"
+	"reflect"
 )
 
 type IBot interface {
@@ -16,6 +17,9 @@ type IBot interface {
 
 func HandleCommand(command command.Command) {
 	log.Println("Handling", command.Name())
+	if reflect.TypeOf(command).Kind() != reflect.Ptr {
+		log.Println("command must be a pointer type")
+	}
 	bot.Commands = append(bot.Commands, command)
 }
 

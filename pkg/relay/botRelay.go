@@ -23,7 +23,7 @@ func GetBotRelay(config connector.Config) BotRelay {
 }
 
 type BotRelay interface {
-	Start(botUser *messages.User) error
+	Start(botUser *messages.User, users []*messages.User) error
 	PassMessage(message *messages.MessagePacket) error
 	PassEvent(event *messages.UserPacket) error
 	PassCommand(command *messages.CommandPacket) error

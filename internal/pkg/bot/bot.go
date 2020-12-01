@@ -23,7 +23,6 @@ type ban struct {
 }
 
 type Bot struct {
-	onlineUsers              map[string]*messages.User
 	connectorRelay           relay.ConnectorRelay
 	commands                 map[string]command.Command
 	config                   bot.Config
@@ -45,8 +44,8 @@ func (b *Bot) UserHasPermission(user *messages.User, permission permissions.Perm
 
 func (b *Bot) OnlineUsers() map[string]messages.User {
 	users := map[string]messages.User{}
-	for nick, user := range b.onlineUsers {
-		users[nick] = messages.User{
+	for _, user := range b.connectorRelay.GetUsers() {
+		users[user.GetNick()] = messages.User{
 			Nick:  user.GetNick(),
 			Id:    user.GetId(),
 			Mod:   user.GetMod(),
