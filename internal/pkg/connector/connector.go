@@ -89,7 +89,7 @@ func (c *Connector) Start() error {
 				args := strings.Split(argString, " ")
 				if len(args) > 0 && len(args[0]) > 0 {
 					command := args[0]
-					argString := strings.TrimPrefix(argString, command)
+					argString := strings.TrimSpace(strings.TrimPrefix(argString, command))
 					log.Println("Command", command)
 					for _, cmd := range c.botRelay.Commands() {
 						if command == cmd.GetName() {
