@@ -30,6 +30,7 @@ message CommandPacket {
   repeated string args = 3;
   user.User user = 4;
   bool private = 5;
+  string argString = 6;
 }
 
 message BotPacket {

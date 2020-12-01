@@ -85,9 +85,11 @@ func (c *Connector) Start() error {
 			}
 			var actualCommand = ""
 			if strings.HasPrefix(mP.GetMessage(), c.botRelay.Trigger()) {
-				args := strings.Split(strings.TrimPrefix(mP.Message, c.botRelay.Trigger()), " ")
+				argString := strings.TrimPrefix(mP.Message, c.botRelay.Trigger())
+				args := strings.Split(argString, " ")
 				if len(args) > 0 && len(args[0]) > 0 {
 					command := args[0]
+					argString := strings.TrimPrefix(argString, command)
 					log.Println("Command", command)
 					for _, cmd := range c.botRelay.Commands() {
 						if command == cmd.GetName() {
@@ -113,6 +115,7 @@ func (c *Connector) Start() error {
 							Timestamp: mP.GetTimestamp(),
 							Command:   actualCommand,
 							Args:      args[1:],
+							ArgString: argString,
 							User:      mP.GetUser(),
 							Private:   mP.GetPrivate(),
 						})
