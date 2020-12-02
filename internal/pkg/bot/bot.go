@@ -220,6 +220,11 @@ func (b *Bot) parseMessagePacket(packet *messages.MessagePacket) ([]*messages.Bo
 		if b.isCommandDisabled(cmd) {
 			continue
 		}
+		if cmd.IgnoreSelf() {
+			if packet.GetUser().GetNick() == b.botUser.GetNick() {
+				continue
+			}
+		}
 		response, err := cmd.OnChat(packet)
 		if err != nil {
 			continue
