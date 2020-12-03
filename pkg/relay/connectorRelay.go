@@ -35,4 +35,5 @@ type ConnectorRelay interface {
 	Send(message *messages.BotPacket) error
 	Recv() (*ConnectorMessage, error)
 	RecvMsg(packet *ConnectorMessage) error
+	Done() <-chan struct{}
 }

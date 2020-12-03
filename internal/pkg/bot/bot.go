@@ -146,7 +146,8 @@ func (b *Bot) Start() error {
 	}
 	b.botUser = confirmation
 	go func() {
-		//user events
+		<-b.connectorRelay.Done()
+		b.cancelFunc()
 	}()
 	go func() {
 		var relayError error
