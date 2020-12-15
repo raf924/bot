@@ -154,28 +154,31 @@ func (b *Bot) Start() error {
 		var message relay.ConnectorMessage
 		var packets []*messages.BotPacket
 		for ; relayError == nil; relayError = b.connectorRelay.RecvMsg(&message) {
-			var err error
-			switch message.Message.(type) {
-			case *messages.CommandPacket:
-				packets, err = b.parseCommandPacket(message.Message.(*messages.CommandPacket))
-			case *messages.MessagePacket:
-				packets, err = b.parseMessagePacket(message.Message.(*messages.MessagePacket))
-			}
-			if err != nil {
-				continue
-			}
-			for _, packet := range packets {
-				if packet == nil {
-					continue
+			relayError := relayError
+			go func() {
+				var err error
+				switch message.Message.(type) {
+				case *messages.CommandPacket:
+					packets, err = b.parseCommandPacket(message.Message.(*messages.CommandPacket))
+				case *messages.MessagePacket:
+					packets, err = b.parseMessagePacket(message.Message.(*messages.MessagePacket))
 				}
-				relayError = b.connectorRelay.Send(packet)
-				if relayError != nil {
-					break
+				if err != nil {
+					return
 				}
-			}
+				for _, packet := range packets {
+					if packet == nil {
+						return
+					}
+					relayError = b.connectorRelay.Send(packet)
+					if relayError != nil {
+						log.Println("error", relayError.Error())
+						b.cancelFunc()
+						return
+					}
+				}
+			}()
 		}
-		log.Println("error", relayError.Error())
-		b.cancelFunc()
 	}()
 	return nil
 }
