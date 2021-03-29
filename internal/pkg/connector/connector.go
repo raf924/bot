@@ -2,9 +2,9 @@ package connector
 
 import (
 	"context"
-	"github.com/raf924/bot/api/messages"
 	"github.com/raf924/bot/pkg/config/connector"
 	"github.com/raf924/bot/pkg/relay"
+	messages "github.com/raf924/connector-api/pkg/gen"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	"sort"

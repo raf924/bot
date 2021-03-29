@@ -3,7 +3,7 @@ package utils
 import (
 	"context"
 	"errors"
-	"github.com/raf924/bot/api/messages"
+	messages "github.com/raf924/connector-api/pkg/gen"
 )
 
 func DoWithContext(f func() (*messages.BotPacket, error), context context.Context) (*messages.BotPacket, error) {

@@ -1,8 +1,8 @@
 package command
 
 import (
-	"github.com/raf924/bot/api/messages"
 	"github.com/raf924/bot/pkg/bot/permissions"
+	messages "github.com/raf924/connector-api/pkg/gen"
 )
 
 type Executor interface {

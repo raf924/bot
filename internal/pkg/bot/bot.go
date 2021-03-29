@@ -3,12 +3,12 @@ package bot
 import (
 	"context"
 	"fmt"
-	"github.com/raf924/bot/api/messages"
 	_ "github.com/raf924/bot/internal/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/config/bot"
 	"github.com/raf924/bot/pkg/relay"
+	messages "github.com/raf924/connector-api/pkg/gen"
 	"log"
 	"time"
 )
@@ -138,7 +138,7 @@ func (b *Bot) Start() error {
 		b.AddCommand(cmd)
 	}
 	confirmation, err := b.connectorRelay.Connect(&messages.RegistrationPacket{
-		Trigger:  "!",
+		Trigger:  b.config.Bot.Trigger,
 		Commands: b.getCommandList(),
 	})
 	if err != nil {

@@ -1,8 +1,8 @@
 package relay
 
 import (
-	"github.com/raf924/bot/api/messages"
 	"github.com/raf924/bot/pkg/config/bot"
+	messages "github.com/raf924/connector-api/pkg/gen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

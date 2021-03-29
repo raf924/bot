@@ -1,6 +1,6 @@
 package users
 
-import "github.com/raf924/bot/api/messages"
+import messages "github.com/raf924/connector-api/pkg/gen"
 
 func Equal(user *messages.User, user2 *messages.User) bool {
 	sameNick := user.Nick == user2.Nick
