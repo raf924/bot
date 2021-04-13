@@ -15,6 +15,12 @@ import (
 	"time"
 )
 
+var helpCommand = &messages.Command{
+	Name:    "help",
+	Aliases: []string{"h"},
+	Usage:   "help",
+}
+
 type Connector struct {
 	config             connector.Config
 	connectionRelay    connection.ConnectionRelay
@@ -55,6 +61,21 @@ func (c *Connector) getCommandOr(mP *messages.MessagePacket) proto.Message {
 		return mP
 	}
 	possibleCommand := args[0]
+	if command.Is(possibleCommand, helpCommand) {
+		var names []string
+		for _, cmd := range c.botRelay.Commands() {
+			names = append(names, cmd.GetName())
+		}
+		err := c.sendToConnection(connection.ChatMessage{
+			Message:   strings.Join(names, ", "),
+			Recipient: mP.GetUser().GetNick(),
+			Private:   mP.GetPrivate(),
+		})
+		if err != nil {
+			panic(err)
+		}
+		return mP
+	}
 	cmd := command.Find(c.botRelay.Commands(), possibleCommand)
 	if cmd == nil {
 		return mP
