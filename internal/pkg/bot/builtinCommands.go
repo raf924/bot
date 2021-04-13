@@ -58,14 +58,21 @@ func (b *Bot) verify(command *messages.CommandPacket) ([]*messages.BotPacket, er
 
 func (b *Bot) ban(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
 	args := command.GetArgs()
-	userToBan := strings.Join(strings.Split(args[0], "@"), "")
-	duration, err := strconv.ParseInt(args[1], 10, 64)
+	if len(args) < 2 {
+		return nil, fmt.Errorf("missing args")
+	}
+	userToBan := strings.TrimLeft(args[0], "@")
+	duration, err := time.ParseDuration(args[1])
 	if err != nil {
-		return nil, err
+		seconds, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		duration = time.Duration(seconds) * time.Second
 	}
 	banInfo := ban{
 		start:    time.Now(),
-		duration: time.Duration(duration) * time.Second,
+		duration: duration,
 	}
 	b.bans[userToBan] = banInfo
 	var banEnd string
