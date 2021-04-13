@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"github.com/raf924/bot/pkg/command"
 	"github.com/raf924/bot/pkg/config/connector"
 	"github.com/raf924/bot/pkg/queue"
@@ -11,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
+	"sort"
 	"strings"
 	"time"
 )
@@ -64,8 +66,12 @@ func (c *Connector) getCommandOr(mP *messages.MessagePacket) proto.Message {
 	if command.Is(possibleCommand, helpCommand) {
 		var names []string
 		for _, cmd := range c.botRelay.Commands() {
-			names = append(names, cmd.GetName())
+			names = append(names, fmt.Sprintf("%s%s", c.config.Trigger, cmd.GetName()))
+			for _, alias := range append(cmd.Aliases) {
+				names = append(names, fmt.Sprintf("%s%s (%s)", c.config.Trigger, alias, cmd.GetName()))
+			}
 		}
+		sort.Strings(names)
 		err := c.sendToConnection(connection.ChatMessage{
 			Message:   strings.Join(names, ", "),
 			Recipient: mP.GetUser().GetNick(),
