@@ -61,6 +61,7 @@ func (l *UserList) Remove(user *gen.User) {
 		return
 	}
 	l.users = append(l.users[:i], l.users[i+1:]...)
+	delete(l.userIndexes, user.GetNick())
 }
 
 func NewUserList(users ...*gen.User) *UserList {
