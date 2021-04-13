@@ -3,6 +3,7 @@ package queue
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"log"
 	"sync"
 )
 
@@ -17,15 +18,15 @@ type queueValue struct {
 	value     interface{}
 	consumers map[string]bool
 	producer  string
+	next      *queueValue
 }
 
 type queue struct {
 	maxConsumers int
-	rwm          *sync.RWMutex
+	locker       sync.Locker
 	c            *sync.Cond
-	buffer       []queueValue
-	consumers    map[string]struct{}
-	vw           ValueWriter
+	bufferHead   *queueValue
+	consumers    map[string]*queueValue
 	maxProducers int
 	producers    map[string]struct{}
 }
@@ -47,7 +48,7 @@ func (q *queue) NewConsumer() (*Consumer, error) {
 		return nil, fmt.Errorf("too many consumers")
 	}
 	id := uuid.NewString()
-	q.consumers[id] = struct{}{}
+	q.consumers[id] = nil
 	return &Consumer{
 		id: id,
 		q:  q,
@@ -55,83 +56,103 @@ func (q *queue) NewConsumer() (*Consumer, error) {
 }
 
 func (q *queue) cancel(id string) {
-	q.rwm.Lock()
-	defer q.rwm.Unlock()
+	q.locker.Lock()
+	defer q.locker.Unlock()
 	delete(q.consumers, id)
-	for _, qv := range q.buffer {
-		delete(qv.consumers, id)
+	var current = q.bufferHead
+	for current != nil {
+		delete(current.consumers, id)
+		current = current.next
 	}
+	q.c.Broadcast()
 }
 
-func (q *queue) consume(id string, value interface{}) error {
-	if _, ok := q.consumers[id]; !ok {
-		return fmt.Errorf("not a registered consumer")
-	}
-	q.rwm.RLock()
-	defer func() {
-		q.rwm.RUnlock()
-	}()
-	if len(q.buffer) == 0 {
-		q.c.Wait()
-	}
-	for _, qv := range q.buffer {
-		if c, ok := qv.consumers[id]; c || !ok {
-			continue
-		}
-		qv.consumers[id] = true
-		err := q.vw.WriteValue(value, qv.value)
-		if err != nil {
-			return fmt.Errorf("error consuming value: %v", err)
-		}
-	}
-	return nil
-}
-
-func (q *queue) produce(id string, value interface{}) error {
-	if _, ok := q.producers[id]; !ok {
-		return fmt.Errorf("unknown producer")
-	}
-	q.rwm.Lock()
-	toDelete := []int{}
-	for i, qv := range q.buffer {
+func (q *queue) cleanUp() {
+	var previous = (*queueValue)(nil)
+	var current = q.bufferHead
+	for current != nil {
 		var allConsumed = true
-		for _, consumed := range qv.consumers {
+		for _, consumed := range current.consumers {
 			if !consumed {
 				allConsumed = false
 				break
 			}
 		}
 		if allConsumed {
-			toDelete = append([]int{i}, toDelete...)
+			if previous == nil {
+				q.bufferHead = current.next
+			} else {
+				previous.next = current.next
+			}
+		} else {
+			previous = current
 		}
+		current = current.next
 	}
-	for _, i := range toDelete {
-		q.buffer = append(q.buffer[:i], q.buffer[i+1:]...)
+}
+
+func (q *queue) consume(id string) (interface{}, error) {
+	q.locker.Lock()
+	defer func() {
+		q.locker.Unlock()
+		r := recover()
+		if r != nil {
+			log.Panicf("consume panic: %v", r)
+		}
+	}()
+	if _, ok := q.consumers[id]; !ok {
+		return nil, fmt.Errorf("not a registered consumer")
 	}
-	qv := queueValue{
+	for q.consumers[id] == nil {
+		q.c.Wait()
+	}
+	qv := q.consumers[id]
+	qv.consumers[id] = true
+	q.consumers[id] = qv.next
+	return qv.value, nil
+}
+
+func (q *queue) produce(id string, value interface{}) error {
+	if _, ok := q.producers[id]; !ok {
+		return fmt.Errorf("unknown producer")
+	}
+	q.locker.Lock()
+	defer func() {
+		q.c.Broadcast()
+	}()
+	q.cleanUp()
+	qv := &queueValue{
 		producer:  id,
 		value:     value,
 		consumers: map[string]bool{},
 	}
 	for id := range q.consumers {
 		qv.consumers[id] = false
+		if q.consumers[id] == nil {
+			q.consumers[id] = qv
+		}
 	}
-	q.buffer = append(q.buffer, qv)
-	q.rwm.Unlock()
-	q.c.Signal()
+	q.locker.Unlock()
+	if q.bufferHead == nil {
+		q.bufferHead = qv
+		return nil
+	}
+	var tail = q.bufferHead
+	for ; tail.next != nil; tail = tail.next {
+	}
+	tail.next = qv
 	return nil
 }
 
 func newQueue() *queue {
-	rwm := &sync.RWMutex{}
+	rwm := &sync.Mutex{}
 	return &queue{
 		maxConsumers: 0,
 		maxProducers: 0,
-		rwm:          rwm,
-		vw:           defaultVW,
-		c:            sync.NewCond(rwm.RLocker()),
-		buffer:       []queueValue{},
-		consumers:    map[string]struct{}{},
+		locker:       rwm,
+		c:            sync.NewCond(rwm),
+		bufferHead:   nil,
+		consumers:    map[string]*queueValue{},
 		producers:    map[string]struct{}{},
 	}
 }

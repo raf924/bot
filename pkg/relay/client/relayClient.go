@@ -1,39 +1,32 @@
-package relay
+package client
 
 import (
 	"github.com/raf924/bot/pkg/config/bot"
+	"github.com/raf924/bot/pkg/queue"
 	messages "github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var connectorRelays = map[string]RelayBuilder{}
 
-type RelayBuilder func(config interface{}) ConnectorRelay
+type RelayBuilder func(config interface{}, withBotExchange *queue.Exchange) RelayClient
 
-func RegisterConnectorRelay(key string, relayBuilder RelayBuilder) {
+func RegisterRelayClient(key string, relayBuilder RelayBuilder) {
 	connectorRelays[key] = relayBuilder
 }
 
-func GetConnectorRelay(config bot.Config) ConnectorRelay {
+func GetRelayClient(config bot.Config, botExchange *queue.Exchange) RelayClient {
 	for key, config := range config.Connector {
 		if builder, ok := connectorRelays[key]; ok {
-			return builder(config)
+			return builder(config, botExchange)
 		}
 	}
 	return nil
 }
 
-type ConnectorMessage struct {
-	Message protoreflect.ProtoMessage
-}
-
-type ConnectorRelay interface {
+type RelayClient interface {
 	GetUsers() []*messages.User
 	OnUserJoin(func(user *messages.User, timestamp int64))
 	OnUserLeft(func(user *messages.User, timestamp int64))
 	Connect(registration *messages.RegistrationPacket) (*messages.User, error)
-	Send(message *messages.BotPacket) error
-	Recv() (*ConnectorMessage, error)
-	RecvMsg(packet *ConnectorMessage) error
 	Done() <-chan struct{}
 }

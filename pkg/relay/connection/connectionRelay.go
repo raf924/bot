@@ -1,22 +1,23 @@
-package relay
+package connection
 
 import (
 	"github.com/raf924/bot/pkg/config/connector"
+	"github.com/raf924/bot/pkg/queue"
 	messages "github.com/raf924/connector-api/pkg/gen"
 )
 
 var connectionRelays = map[string]ConnectionRelayBuilder{}
 
-type ConnectionRelayBuilder func(config interface{}) ConnectionRelay
+type ConnectionRelayBuilder func(config interface{}, connectorExchange *queue.Exchange) ConnectionRelay
 
 func RegisterConnectionRelay(key string, relayBuilder ConnectionRelayBuilder) {
 	connectionRelays[key] = relayBuilder
 }
 
-func GetConnectionRelay(config connector.Config) ConnectionRelay {
-	for key, config := range config.Connector.Connection {
+func GetConnectionRelay(config connector.Config, connectorExchange *queue.Exchange) ConnectionRelay {
+	for key, config := range config.Connection {
 		if builder, ok := connectionRelays[key]; ok {
-			return builder(config)
+			return builder(config, connectorExchange)
 		}
 	}
 	return nil
@@ -53,7 +54,4 @@ type ConnectionRelay interface {
 	OnUserJoin(func(user *messages.User, timestamp int64))
 	OnUserLeft(func(user *messages.User, timestamp int64))
 	Connect(nick string) error
-	Send(message Message) error
-	Recv() (*messages.MessagePacket, error)
-	RecvMsg(packet *messages.MessagePacket) error
 }

@@ -5,8 +5,8 @@ type Consumer struct {
 	q  consumer
 }
 
-func (c *Consumer) Consume(value interface{}) error {
-	return c.q.consume(c.id, value)
+func (c *Consumer) Consume() (interface{}, error) {
+	return c.q.consume(c.id)
 }
 
 func (c *Consumer) Cancel() {
@@ -14,6 +14,6 @@ func (c *Consumer) Cancel() {
 }
 
 type consumer interface {
-	consume(id string, value interface{}) error
+	consume(id string) (interface{}, error)
 	cancel(id string)
 }

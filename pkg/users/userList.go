@@ -3,14 +3,18 @@ package users
 import (
 	"github.com/raf924/connector-api/pkg/gen"
 	"strings"
+	"sync"
 )
 
 type UserList struct {
+	rwm         *sync.RWMutex
 	users       []*gen.User
 	userIndexes map[string]int
 }
 
 func (l *UserList) All() []*gen.User {
+	l.rwm.RLock()
+	defer l.rwm.RUnlock()
 	var list = make([]*gen.User, len(l.users))
 	for _, u := range l.users {
 		list = append(list, &gen.User{
@@ -24,10 +28,14 @@ func (l *UserList) All() []*gen.User {
 }
 
 func (l *UserList) Get(i int) *gen.User {
+	l.rwm.RLock()
+	defer l.rwm.RUnlock()
 	return l.users[i]
 }
 
 func (l *UserList) Find(nick string) *gen.User {
+	l.rwm.RLock()
+	defer l.rwm.RUnlock()
 	i, ok := l.userIndexes[nick]
 	if !ok {
 		return nil
@@ -36,6 +44,8 @@ func (l *UserList) Find(nick string) *gen.User {
 }
 
 func (l *UserList) Add(user *gen.User) {
+	l.rwm.Lock()
+	defer l.rwm.Unlock()
 	if len(strings.TrimSpace(user.GetNick())) == 0 {
 		return
 	}
@@ -44,6 +54,8 @@ func (l *UserList) Add(user *gen.User) {
 }
 
 func (l *UserList) Remove(user *gen.User) {
+	l.rwm.Lock()
+	defer l.rwm.Unlock()
 	i, ok := l.userIndexes[user.GetNick()]
 	if !ok {
 		return
@@ -55,6 +67,7 @@ func NewUserList(users ...*gen.User) *UserList {
 	ul := &UserList{
 		users:       []*gen.User{},
 		userIndexes: map[string]int{},
+		rwm:         &sync.RWMutex{},
 	}
 	for _, user := range users {
 		ul.Add(user)

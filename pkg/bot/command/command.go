@@ -41,7 +41,7 @@ type Command interface {
 	Interceptor
 }
 
-// Commands should embed NoOpCommand to avoid noop method implementations.
+// NoOpCommand : Commands should embed NoOpCommand to avoid noop method implementations.
 // By embedding this, a Command implementation only needs to implement Name and Execute for basic functionality
 // IgnoreSelf returns true
 type NoOpCommand struct {
