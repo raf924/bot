@@ -4,6 +4,7 @@ import (
 	"github.com/raf924/bot/pkg/config/connector"
 	"github.com/raf924/bot/pkg/queue"
 	messages "github.com/raf924/connector-api/pkg/gen"
+	"google.golang.org/protobuf/proto"
 )
 
 var relayServers = map[string]RelayServerBuilder{}
@@ -25,6 +26,7 @@ func GetRelayServer(config connector.Config, connectorExchange *queue.Exchange) 
 
 type RelayServer interface {
 	Start(botUser *messages.User, users []*messages.User, trigger string) error
-	Trigger() string
 	Commands() []*messages.Command
+	Send(message proto.Message) error
+	Recv() (*messages.BotPacket, error)
 }

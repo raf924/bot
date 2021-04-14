@@ -12,6 +12,12 @@ type UserList struct {
 	userIndexes map[string]int
 }
 
+func (l *UserList) Copy() *UserList {
+	l.rwm.RLock()
+	defer l.rwm.RUnlock()
+	return NewUserList(l.All()...)
+}
+
 func (l *UserList) All() []*gen.User {
 	l.rwm.RLock()
 	defer l.rwm.RUnlock()

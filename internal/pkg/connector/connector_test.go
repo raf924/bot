@@ -5,6 +5,7 @@ import (
 	"github.com/raf924/bot/pkg/relay/connection"
 	"github.com/raf924/bot/pkg/users"
 	messages "github.com/raf924/connector-api/pkg/gen"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"testing"
 )
@@ -12,12 +13,16 @@ import (
 type dummyServer struct {
 }
 
-func (d *dummyServer) Start(botUser *messages.User, users []*messages.User, trigger string) error {
-	return nil
+func (d *dummyServer) Send(message proto.Message) error {
+	panic("implement me")
 }
 
-func (d *dummyServer) Trigger() string {
-	return "!"
+func (d *dummyServer) Recv() (*messages.BotPacket, error) {
+	panic("implement me")
+}
+
+func (d *dummyServer) Start(botUser *messages.User, users []*messages.User, trigger string) error {
+	return nil
 }
 
 func (d *dummyServer) Commands() []*messages.Command {
@@ -37,6 +42,14 @@ type dummyConnection struct {
 	users *users.UserList
 }
 
+func (d *dummyConnection) Recv() (*messages.MessagePacket, error) {
+	panic("implement me")
+}
+
+func (d *dummyConnection) Send(message connection.Message) error {
+	panic("implement me")
+}
+
 func (d *dummyConnection) Start() error {
 	return nil
 }
@@ -45,8 +58,8 @@ func (d *dummyConnection) CommandTrigger() string {
 	return "!"
 }
 
-func (d *dummyConnection) GetUsers() []*messages.User {
-	return d.users.All()
+func (d *dummyConnection) GetUsers() *users.UserList {
+	return d.users.Copy()
 }
 
 func (d *dummyConnection) OnUserJoin(f func(user *messages.User, timestamp int64)) {
