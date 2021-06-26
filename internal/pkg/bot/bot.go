@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	_ "github.com/raf924/bot/internal/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/bot/command"
@@ -11,6 +12,8 @@ import (
 	"github.com/raf924/bot/pkg/relay/client"
 	messages "github.com/raf924/connector-api/pkg/gen"
 	"log"
+	"os"
+	"sync"
 	"time"
 )
 
@@ -19,8 +22,8 @@ const defaultTimeout = 30 * time.Second
 var Commands []command.Command
 
 type ban struct {
-	start    time.Time
-	duration time.Duration
+	Start    time.Time     `json:"Start"`
+	Duration time.Duration `json:"Duration"`
 }
 
 type Bot struct {
@@ -36,6 +39,11 @@ type Bot struct {
 	ctx                      context.Context
 	cancelFunc               context.CancelFunc
 	commandQueue             queue.Queue
+	banStorageMutex          *sync.Mutex
+}
+
+func (b *Bot) Trigger() string {
+	return b.config.Trigger
 }
 
 func (b *Bot) UserHasPermission(user *messages.User, permission permissions.Permission) bool {
@@ -179,7 +187,9 @@ func (b *Bot) initCommands() {
 }
 
 func (b *Bot) Start() error {
+	b.banStorageMutex = &sync.Mutex{}
 	b.ctx, b.cancelFunc = context.WithCancel(context.Background())
+	b.loadBans()
 	var err error
 	b.initCommands()
 	confirmation, err := b.connectorRelay.Connect(&messages.RegistrationPacket{
@@ -248,11 +258,20 @@ func (b *Bot) relayBotPackets(cmd command.Command, commandConsumer *queue.Consum
 			}
 		case *messages.CommandPacket:
 			message := m.(*messages.CommandPacket)
-			if !command.Is(message.GetCommand(), cmd) {
-				continue
-			}
 			if b.isBanned(message.GetUser()) {
 				continue
+			}
+			if !command.Is(message.GetCommand(), cmd) {
+				packets, err = cmd.OnChat(&messages.MessagePacket{
+					Timestamp: message.GetTimestamp(),
+					Message:   fmt.Sprintf("%s %s", message.GetCommand(), message.GetArgString()),
+					User:      message.GetUser(),
+					Private:   message.GetPrivate(),
+				})
+				if err != nil {
+					log.Println("Command", cmd.Name(), "Execute error:", err.Error())
+				}
+				break
 			}
 			packets, err = cmd.Execute(message)
 			if err != nil {
@@ -291,9 +310,40 @@ func (b *Bot) isBanned(user *messages.User) bool {
 	if !exists {
 		return false
 	}
-	if bn.duration < 0 || bn.start.Add(bn.duration).After(time.Now()) {
+	if bn.Duration < 0 || bn.Start.Add(bn.Duration).After(time.Now()) {
 		return true
 	}
 	delete(b.bans, user.Nick)
 	return false
+}
+
+func (b *Bot) loadBans() {
+	banStorageLocation := b.config.ApiKeys["banStorageLocation"]
+	f, err := os.Open(banStorageLocation)
+	if err != nil {
+		log.Println("could not load bans: ", err)
+		return
+	}
+	defer f.Close()
+	json.NewDecoder(f).Decode(b.bans)
+}
+
+func (b *Bot) saveBans() {
+	go func() {
+		b.banStorageMutex.Lock()
+		defer b.banStorageMutex.Unlock()
+		banStorageLocation := b.config.ApiKeys["banStorageLocation"]
+		file, err := os.OpenFile(banStorageLocation, os.O_CREATE|os.O_WRONLY, os.ModePerm)
+		if err != nil {
+			log.Println("error opening ban file:", err.Error())
+			return
+		}
+		defer file.Close()
+		err = json.NewEncoder(file).Encode(b.bans)
+		if err != nil {
+			log.Println("error writing to ban file:", err.Error())
+			return
+		}
+	}()
+
 }

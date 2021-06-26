@@ -90,6 +90,7 @@ func TestConnector(t *testing.T) {
 	err := cr.Start()
 	if err != nil {
 		t.Errorf("unexpected error = %v", err)
+		return
 	}
 	sentPacket := &messages.MessagePacket{
 		Timestamp: timestamppb.Now(),

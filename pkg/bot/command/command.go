@@ -10,6 +10,7 @@ type Executor interface {
 	ApiKeys() map[string]string
 	OnlineUsers() map[string]messages.User
 	UserHasPermission(user *messages.User, permission permissions.Permission) bool
+	Trigger() string
 }
 
 type Interceptor interface {

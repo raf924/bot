@@ -57,6 +57,7 @@ func (b *Bot) verify(command *messages.CommandPacket) ([]*messages.BotPacket, er
 }
 
 func (b *Bot) ban(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
+	defer b.saveBans()
 	args := command.GetArgs()
 	if len(args) < 2 {
 		return nil, fmt.Errorf("missing args")
@@ -71,15 +72,15 @@ func (b *Bot) ban(command *messages.CommandPacket) ([]*messages.BotPacket, error
 		duration = time.Duration(seconds) * time.Second
 	}
 	banInfo := ban{
-		start:    time.Now(),
-		duration: duration,
+		Start:    time.Now(),
+		Duration: duration,
 	}
 	b.bans[userToBan] = banInfo
 	var banEnd string
 	if duration < 0 {
 		banEnd = "the end of times"
 	} else {
-		banEnd = banInfo.start.Add(banInfo.duration).UTC().String()
+		banEnd = banInfo.Start.Add(banInfo.Duration).UTC().String()
 	}
 	packet := &messages.BotPacket{
 		Timestamp: timestamppb.Now(),
