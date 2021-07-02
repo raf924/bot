@@ -2,10 +2,10 @@ package connector
 
 import "github.com/raf924/bot/pkg/queue"
 
-var ToConnectionQueue = queue.NewQueue(queue.WithMaxProducers(1))
+var ToConnectionQueue = queue.NewQueue()
 var FromConnectionQueue = queue.NewQueue()
-var FromBotQueue = queue.NewQueue(queue.WithMaxConsumers(1))
-var ToBotQueue = queue.NewQueue(queue.WithMaxProducers(1))
+var FromBotQueue = queue.NewQueue()
+var ToBotQueue = queue.NewQueue()
 
 func WithConnectionExchange() (*queue.Exchange, error) {
 	return queue.NewExchange(ToConnectionQueue, FromConnectionQueue)

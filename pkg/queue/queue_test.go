@@ -1,10 +1,10 @@
 package queue
 
 import (
-	"fmt"
 	"github.com/raf924/connector-api/pkg/gen"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 )
@@ -65,7 +65,7 @@ func TestProtoMessage(t *testing.T) {
 	switch pm.(type) {
 	case *gen.MessagePacket:
 	default:
-		t.Errorf("expected MessagePacket")
+		t.Errorf("expected MessagePacket, got %v", pm)
 	}
 }
 
@@ -98,11 +98,13 @@ func TestQueueConsumer_Consume(t *testing.T) {
 
 func benchmarkType(valueGen valueGenerator, valueCount int) func(b *testing.B) {
 	return func(b *testing.B) {
+		b.ReportAllocs()
 		b.StopTimer()
 		q := NewQueue()
 		p, err := q.NewProducer()
 		if err != nil {
 			b.Errorf("unexpected error = %v", err)
+			return
 		}
 		c, err := q.NewConsumer()
 		if err != nil {
@@ -114,17 +116,21 @@ func benchmarkType(valueGen valueGenerator, valueCount int) func(b *testing.B) {
 				err := p.Produce(valueGen.Gen())
 				if err != nil {
 					b.Errorf("unexpected error = %v", err)
-					return
 				}
 			}
+			wg := sync.WaitGroup{}
+			wg.Add(valueCount)
 			b.StartTimer()
 			var r interface{}
 			for i := 0; i < valueCount; i++ {
-				if r, err = c.Consume(); err != nil {
-					b.Errorf("unexpected error = %v", err)
-					return
-				}
+				go func() {
+					if r, err = c.Consume(); err != nil {
+						b.Errorf("unexpected error = %v", err)
+					}
+					wg.Done()
+				}()
 			}
+			wg.Wait()
 			b.StopTimer()
 			_ = r
 		}
@@ -132,42 +138,41 @@ func benchmarkType(valueGen valueGenerator, valueCount int) func(b *testing.B) {
 }
 
 func TestConsumer_Cancel(t *testing.T) {
-	q := newQueue()
+	q := NewQueue()
 	p, _ := q.NewProducer()
 	c, _ := q.NewConsumer()
 	_ = p.Produce(5)
 	c.Cancel()
-	if _, ok := q.consumers[c.id]; ok {
-		t.Errorf("consumer found in consumer list")
-	}
-	if _, ok := q.bufferHead.consumers[c.id]; ok {
-		t.Errorf("consumer found in buffer")
+	_, err := c.Consume()
+	if err == nil {
+		t.Errorf("expected error")
 	}
 }
 
-func TestQueue_CleanUp(t *testing.T) {
-	q := newQueue()
-	p, _ := q.NewProducer()
+func BenchmarkQueue(b *testing.B) {
+	for i := 1; i < b.N; i++ {
+		b.Run("Consume Ints", benchmarkType(intBenchmark.vGen, i))
+	}
+}
+
+func BenchmarkProducer_Produce(b *testing.B) {
+	b.ReportAllocs()
+	q := NewQueue()
 	c, _ := q.NewConsumer()
-	_ = p.Produce(5)
-	_, _ = c.Consume()
-	q.cleanUp()
-	if q.bufferHead != nil {
-		t.Errorf("buffer should be empty, has = %v", q.bufferHead)
-	}
-}
-
-func BenchmarkQueueConsumer_Consume(b *testing.B) {
-	for i := 1; i <= 10; i++ {
-		b.Run(fmt.Sprintf("Consume Ints %d", i*10), benchmarkType(intBenchmark.vGen, i*10))
-	}
-	for i := 1; i <= 10; i++ {
-		b.Run(fmt.Sprintf("Consume MessagePackets %d", i*10), benchmarkType(messagePacketBenchmark.vGen, i*10))
+	for i := 0; i < b.N; i++ {
+		err := q.produce("", 5)
+		if err != nil {
+			b.Error(err)
+		}
+		_, err = c.Consume()
+		if err != nil {
+			b.Error(err)
+		}
 	}
 }
 
 func TestConsumer_Consume(t *testing.T) {
-	var q = newQueue()
+	var q = NewQueue()
 	c1, _ := q.NewConsumer()
 	c2, _ := q.NewConsumer()
 	c := make(chan interface{})
@@ -197,7 +202,7 @@ func TestQueueFifo(t *testing.T) {
 	for i := 0; i < len(values); i++ {
 		values[i] = rand.Int()
 	}
-	var q = newQueue()
+	var q = NewQueue()
 	c, _ := q.NewConsumer()
 	p, _ := q.NewProducer()
 	for _, value := range values {
@@ -217,7 +222,7 @@ func TestQueueFifo(t *testing.T) {
 }
 
 func TestQueueSequential(t *testing.T) {
-	q := newQueue()
+	q := NewQueue()
 	p, _ := q.NewProducer()
 	c, _ := q.NewConsumer()
 	_ = p.Produce(5)
@@ -227,7 +232,7 @@ func TestQueueSequential(t *testing.T) {
 }
 
 func TestParallelConsumer(t *testing.T) {
-	q := newQueue()
+	q := NewQueue()
 	p, _ := q.NewProducer()
 	c, _ := q.NewConsumer()
 	go func() {

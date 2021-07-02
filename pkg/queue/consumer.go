@@ -2,7 +2,7 @@ package queue
 
 type Consumer struct {
 	id string
-	q  consumer
+	q  consumable
 }
 
 func (c *Consumer) Consume() (interface{}, error) {
@@ -13,7 +13,7 @@ func (c *Consumer) Cancel() {
 	c.q.cancel(c.id)
 }
 
-type consumer interface {
+type consumable interface {
 	consume(id string) (interface{}, error)
 	cancel(id string)
 }

@@ -85,6 +85,8 @@ func TestConnector(t *testing.T) {
 			Id:    "id",
 			Mod:   false,
 			Admin: false,
+		}, &messages.User{
+			Nick: "raf924",
 		}),
 	}, &dummyServer{}, cnEx, botEx)
 	err := cr.Start()
