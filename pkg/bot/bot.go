@@ -44,8 +44,7 @@ func NewBot(config botConfig.Config) pkg.Runnable {
 		config,
 		userPermissionManager,
 		commandPermissionManager,
-		client.GetRelayClient(config, bot.WithBotExchange),
-		bot.WithRelayExchange,
+		client.GetRelayClient(config),
 		bot.Commands...,
 	)
 }

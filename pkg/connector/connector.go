@@ -9,23 +9,7 @@ import (
 )
 
 func NewConnector(config cnf.Config) pkg.Runnable {
-	withConnectionExchange, err := connector.WithConnectionExchange()
-	if err != nil {
-		panic(err)
-	}
-	withBotExchange, err := connector.WithBotExchange()
-	if err != nil {
-		panic(err)
-	}
-	connectionExchange, err := connector.ConnectionExchange()
-	if err != nil {
-		panic(err)
-	}
-	botExchange, err := connector.BotExchange()
-	if err != nil {
-		panic(err)
-	}
-	connection := connectionRelay.GetConnectionRelay(config, connectionExchange)
-	bot := server.GetRelayServer(config, botExchange)
-	return connector.NewConnector(config, connection, bot, withConnectionExchange, withBotExchange)
+	connection := connectionRelay.GetConnectionRelay(config)
+	bot := server.GetRelayServer(config)
+	return connector.NewConnector(config, connection, bot)
 }

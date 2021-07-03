@@ -75,10 +75,6 @@ func (d *dummyConnection) Connect(nick string) error {
 }
 
 func TestConnector(t *testing.T) {
-	botEx, _ := Cr2BExchange()
-	cnEx, _ := Cr2CnExchange()
-	bcrEx, _ := B2CrExchange()
-	cncrEx, _ := Cn2CrExchange()
 	cr := NewConnector(connector.Config{Name: "raf924", Bot: nil, Connection: nil}, &dummyConnection{
 		users: users.NewUserList(&messages.User{
 			Nick:  "test",
@@ -88,7 +84,7 @@ func TestConnector(t *testing.T) {
 		}, &messages.User{
 			Nick: "raf924",
 		}),
-	}, &dummyServer{}, cnEx, botEx)
+	}, &dummyServer{})
 	err := cr.Start()
 	if err != nil {
 		t.Errorf("unexpected error = %v", err)
@@ -105,43 +101,30 @@ func TestConnector(t *testing.T) {
 		},
 		Private: false,
 	}
-	err = cncrEx.Produce(sentPacket)
-	if err != nil {
-		t.Errorf("unexpected error = %v", err)
-	}
-	m, err := bcrEx.Consume()
-	if err != nil {
-		t.Errorf("unexpected errror := %v", err)
-	}
-	switch m.(type) {
-	case *messages.MessagePacket:
-		mp := m.(*messages.MessagePacket)
-		if mp.GetMessage() != sentPacket.GetMessage() {
-			t.Errorf("expected message %v got %v", sentPacket.GetMessage(), mp.GetMessage())
+	go func() {
+		err = cr.sendToServer(sentPacket)
+		if err != nil {
+			t.Errorf("unexpected error = %v", err)
 		}
-	default:
-		t.Errorf("expected MessagePacket")
-	}
+		m, err := cr.receiveFromConnection()
+		if err != nil {
+			t.Errorf("unexpected errror := %v", err)
+		}
+		if m.GetMessage() != sentPacket.GetMessage() {
+			t.Errorf("expected message %v got %v", sentPacket.GetMessage(), m.GetMessage())
+		}
 
-	if err := bcrEx.Produce(&messages.BotPacket{
-		Timestamp: sentPacket.GetTimestamp(),
-		Message:   sentPacket.GetMessage(),
-		Recipient: sentPacket.GetUser(),
-		Private:   sentPacket.GetPrivate(),
-	}); err != nil {
-		t.Errorf("unexpected error = %v", err)
-	}
-	m, err = cncrEx.Consume()
-	if err != nil {
-		t.Errorf("unexpected error = %v", err)
-	}
-	switch m.(type) {
-	case connection.ChatMessage:
-		cm := m.(connection.ChatMessage)
+		packetFromBot := &messages.BotPacket{
+			Timestamp: sentPacket.GetTimestamp(),
+			Message:   sentPacket.GetMessage(),
+			Recipient: sentPacket.GetUser(),
+			Private:   sentPacket.GetPrivate(),
+		}
+		_ = packetFromBot
+		var cm connection.ChatMessage
 		if cm.Message != sentPacket.GetMessage() {
 			t.Errorf("expected message %v got %v", sentPacket.GetMessage(), cm.Message)
 		}
-	default:
-		t.Errorf("expected chat message")
-	}
+	}()
+	<-cr.Done()
 }

@@ -2,23 +2,22 @@ package connection
 
 import (
 	"github.com/raf924/bot/pkg/config/connector"
-	"github.com/raf924/bot/pkg/queue"
 	"github.com/raf924/bot/pkg/users"
 	messages "github.com/raf924/connector-api/pkg/gen"
 )
 
-var connectionRelays = map[string]ConnectionRelayBuilder{}
+var connectionRelays = map[string]RelayBuilder{}
 
-type ConnectionRelayBuilder func(config interface{}, connectorExchange *queue.Exchange) Relay
+type RelayBuilder func(config interface{}) Relay
 
-func RegisterConnectionRelay(key string, relayBuilder ConnectionRelayBuilder) {
+func RegisterConnectionRelay(key string, relayBuilder RelayBuilder) {
 	connectionRelays[key] = relayBuilder
 }
 
-func GetConnectionRelay(config connector.Config, connectorExchange *queue.Exchange) Relay {
+func GetConnectionRelay(config connector.Config) Relay {
 	for key, config := range config.Connection {
 		if builder, ok := connectionRelays[key]; ok {
-			return builder(config, connectorExchange)
+			return builder(config)
 		}
 	}
 	return nil

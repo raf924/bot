@@ -17,8 +17,6 @@ import (
 	"time"
 )
 
-const defaultTimeout = 30 * time.Second
-
 var Commands []command.Command
 
 type ban struct {
@@ -28,7 +26,6 @@ type ban struct {
 
 type Bot struct {
 	connectorRelay           client.RelayClient
-	relayExchange            *queue.Exchange
 	loadedCommands           map[string]command.Command
 	commands                 []command.Command
 	config                   bot.Config
@@ -88,7 +85,6 @@ func NewBot(
 	userPermissionManager permissions.PermissionManager,
 	commandPermissionManager permissions.PermissionManager,
 	relay client.RelayClient,
-	relayExchange *queue.Exchange,
 	commands ...command.Command,
 ) *Bot {
 	return &Bot{
@@ -99,7 +95,6 @@ func NewBot(
 		commandPermissionManager: commandPermissionManager,
 		userPermissionManager:    userPermissionManager,
 		connectorRelay:           relay,
-		relayExchange:            relayExchange,
 		commandQueue:             queue.NewQueue(),
 	}
 }
@@ -209,7 +204,6 @@ func (b *Bot) Start() error {
 	go func() {
 		<-b.connectorRelay.Done()
 		b.cancelFunc()
-		b.relayExchange.Cancel()
 	}()
 	commandProducer, err := b.commandQueue.NewProducer()
 	if err != nil {
@@ -217,7 +211,7 @@ func (b *Bot) Start() error {
 	}
 	go func() {
 		for {
-			packet, err := b.relayExchange.Consume()
+			packet, err := b.connectorRelay.Recv()
 			if err != nil {
 				panic(err)
 			}
@@ -285,7 +279,7 @@ func (b *Bot) relayBotPackets(cmd command.Command, commandConsumer *queue.Consum
 			}
 		}
 		for _, packet := range packets {
-			err := b.relayExchange.Produce(packet)
+			err := b.connectorRelay.Send(packet)
 			if err != nil {
 				return err
 			}
@@ -324,8 +318,8 @@ func (b *Bot) loadBans() {
 		log.Println("could not load bans: ", err)
 		return
 	}
-	defer f.Close()
-	json.NewDecoder(f).Decode(b.bans)
+	_ = json.NewDecoder(f).Decode(&b.bans)
+	_ = f.Close()
 }
 
 func (b *Bot) saveBans() {
@@ -338,8 +332,8 @@ func (b *Bot) saveBans() {
 			log.Println("error opening ban file:", err.Error())
 			return
 		}
-		defer file.Close()
 		err = json.NewEncoder(file).Encode(b.bans)
+		_ = file.Close()
 		if err != nil {
 			log.Println("error writing to ban file:", err.Error())
 			return

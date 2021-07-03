@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/raf924/bot/pkg/command"
 	"github.com/raf924/bot/pkg/config/connector"
-	"github.com/raf924/bot/pkg/queue"
 	"github.com/raf924/bot/pkg/relay/connection"
 	"github.com/raf924/bot/pkg/relay/server"
 	"github.com/raf924/bot/pkg/users"
@@ -196,7 +195,7 @@ func (c *Connector) sendToConnection(m connection.Message) error {
 	return c.connectionRelay.Send(m)
 }
 
-func NewConnector(config connector.Config, connection connection.Relay, bot server.RelayServer, connectionExchange, botExchange *queue.Exchange) *Connector {
+func NewConnector(config connector.Config, connection connection.Relay, bot server.RelayServer) *Connector {
 	return &Connector{
 		config:          config,
 		connectionRelay: connection,

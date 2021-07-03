@@ -27,6 +27,14 @@ var user = &messages.User{
 type dummyRelay struct {
 }
 
+func (d *dummyRelay) Send(packet *messages.BotPacket) error {
+	panic("implement me")
+}
+
+func (d *dummyRelay) Recv() (proto.Message, error) {
+	panic("implement me")
+}
+
 func (d *dummyRelay) GetUsers() []*messages.User {
 	return []*messages.User{botUser, user}
 }
@@ -152,7 +160,7 @@ func TestBot(t *testing.T) {
 			},
 			Permissions: bot.PermissionConfig{},
 		},
-	}, &dummyPermissionManager{}, &dummyPermissionManager{}, &dummyRelay{}, WithRelayExchange, &testCommand{
+	}, &dummyPermissionManager{}, &dummyPermissionManager{}, &dummyRelay{}, &testCommand{
 		init: func(executor command.Executor) error {
 			return nil
 		},

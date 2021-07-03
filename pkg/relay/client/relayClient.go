@@ -2,22 +2,22 @@ package client
 
 import (
 	"github.com/raf924/bot/pkg/config/bot"
-	"github.com/raf924/bot/pkg/queue"
 	messages "github.com/raf924/connector-api/pkg/gen"
+	"google.golang.org/protobuf/proto"
 )
 
 var connectorRelays = map[string]RelayBuilder{}
 
-type RelayBuilder func(config interface{}, withBotExchange *queue.Exchange) RelayClient
+type RelayBuilder func(config interface{}) RelayClient
 
 func RegisterRelayClient(key string, relayBuilder RelayBuilder) {
 	connectorRelays[key] = relayBuilder
 }
 
-func GetRelayClient(config bot.Config, botExchange *queue.Exchange) RelayClient {
+func GetRelayClient(config bot.Config) RelayClient {
 	for key, config := range config.Connector {
 		if builder, ok := connectorRelays[key]; ok {
-			return builder(config, botExchange)
+			return builder(config)
 		}
 	}
 	return nil
@@ -28,5 +28,7 @@ type RelayClient interface {
 	OnUserJoin(func(user *messages.User, timestamp int64))
 	OnUserLeft(func(user *messages.User, timestamp int64))
 	Connect(registration *messages.RegistrationPacket) (*messages.User, error)
+	Send(packet *messages.BotPacket) error
+	Recv() (proto.Message, error)
 	Done() <-chan struct{}
 }
