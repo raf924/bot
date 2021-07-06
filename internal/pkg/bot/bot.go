@@ -2,7 +2,6 @@ package bot
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	_ "github.com/raf924/bot/internal/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/bot/command"
@@ -10,9 +9,9 @@ import (
 	"github.com/raf924/bot/pkg/config/bot"
 	"github.com/raf924/bot/pkg/queue"
 	"github.com/raf924/bot/pkg/relay/client"
+	"github.com/raf924/bot/pkg/storage"
 	messages "github.com/raf924/connector-api/pkg/gen"
 	"log"
-	"os"
 	"sync"
 	"time"
 )
@@ -37,6 +36,7 @@ type Bot struct {
 	cancelFunc               context.CancelFunc
 	commandQueue             queue.Queue
 	banStorageMutex          *sync.Mutex
+	banStorage               storage.Storage
 }
 
 func (b *Bot) Trigger() string {
@@ -87,6 +87,11 @@ func NewBot(
 	relay client.RelayClient,
 	commands ...command.Command,
 ) *Bot {
+	banStorage, err := storage.NewFileStorage(config.ApiKeys["banStorageLocation"])
+	if err != nil {
+		log.Println(err)
+		banStorage = storage.NewNoOpStorage()
+	}
 	return &Bot{
 		bans:                     make(map[string]ban),
 		loadedCommands:           make(map[string]command.Command),
@@ -96,6 +101,7 @@ func NewBot(
 		userPermissionManager:    userPermissionManager,
 		connectorRelay:           relay,
 		commandQueue:             queue.NewQueue(),
+		banStorage:               banStorage,
 	}
 }
 
@@ -312,32 +318,13 @@ func (b *Bot) isBanned(user *messages.User) bool {
 }
 
 func (b *Bot) loadBans() {
-	banStorageLocation := b.config.ApiKeys["banStorageLocation"]
-	f, err := os.Open(banStorageLocation)
+	err := b.banStorage.Load(&b.bans)
 	if err != nil {
 		log.Println("could not load bans: ", err)
 		return
 	}
-	_ = json.NewDecoder(f).Decode(&b.bans)
-	_ = f.Close()
 }
 
 func (b *Bot) saveBans() {
-	go func() {
-		b.banStorageMutex.Lock()
-		defer b.banStorageMutex.Unlock()
-		banStorageLocation := b.config.ApiKeys["banStorageLocation"]
-		file, err := os.OpenFile(banStorageLocation, os.O_CREATE|os.O_WRONLY, os.ModePerm)
-		if err != nil {
-			log.Println("error opening ban file:", err.Error())
-			return
-		}
-		err = json.NewEncoder(file).Encode(b.bans)
-		_ = file.Close()
-		if err != nil {
-			log.Println("error writing to ban file:", err.Error())
-			return
-		}
-	}()
-
+	b.banStorage.Save(b.bans)
 }
