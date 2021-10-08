@@ -41,10 +41,11 @@ type Bot struct {
 	commandQueue             queue.Queue
 	banStorage               storage.Storage
 	errorChan                chan error
+	trigger                  string
 }
 
 func (b *Bot) Trigger() string {
-	return b.config.Trigger
+	return b.trigger
 }
 
 func (b *Bot) UserHasPermission(user *domain.User, permission permissions.Permission) bool {
@@ -194,7 +195,9 @@ func (b *Bot) Start() error {
 	if err != nil {
 		return err
 	}
-	b.botUser = confirmation
+	b.botUser = confirmation.CurrentUser()
+	b.users = confirmation.Users()
+	b.trigger = confirmation.Trigger()
 	go func() {
 		err := <-b.errorChan
 		log.Println(err)
