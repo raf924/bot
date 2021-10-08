@@ -163,9 +163,21 @@ func NewRegistrationMessage(commands []*Command) *RegistrationMessage {
 type ConfirmationMessage struct {
 	currentUser *User
 	trigger     string
-	users       []*User
+	users       UserList
+}
+
+func (c *ConfirmationMessage) CurrentUser() *User {
+	return c.currentUser
+}
+
+func (c *ConfirmationMessage) Trigger() string {
+	return c.trigger
+}
+
+func (c *ConfirmationMessage) Users() UserList {
+	return c.users.Copy()
 }
 
 func NewConfirmationMessage(currentUser *User, trigger string, users []*User) *ConfirmationMessage {
-	return &ConfirmationMessage{currentUser: currentUser, trigger: trigger, users: users}
+	return &ConfirmationMessage{currentUser: currentUser, trigger: trigger, users: ImmutableUserList(NewUserList(users...))}
 }

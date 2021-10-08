@@ -23,7 +23,7 @@ func GetRelayClient(config bot.Config) RelayClient {
 }
 
 type RelayClient interface {
-	Connect(registration *domain.RegistrationMessage) (*domain.User, error)
+	Connect(registration *domain.RegistrationMessage) (*domain.ConfirmationMessage, error)
 	Send(packet *domain.ClientMessage) error
 	Recv() (domain.ServerMessage, error)
 }
