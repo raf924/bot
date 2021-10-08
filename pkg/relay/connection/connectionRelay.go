@@ -2,8 +2,8 @@ package connection
 
 import (
 	"github.com/raf924/bot/pkg/config/connector"
-	"github.com/raf924/bot/pkg/users"
-	messages "github.com/raf924/connector-api/pkg/gen"
+	"github.com/raf924/bot/pkg/domain"
+	"time"
 )
 
 var connectionRelays = map[string]RelayBuilder{}
@@ -24,12 +24,12 @@ func GetConnectionRelay(config connector.Config) Relay {
 }
 
 type Message interface {
-	unimplementedMethod()
+	unimplementedMessageMethod()
 }
 
 type emptyMessage struct{}
 
-func (e emptyMessage) unimplementedMethod() {}
+func (e emptyMessage) unimplementedMessageMethod() {}
 
 type ChatMessage struct {
 	emptyMessage
@@ -49,11 +49,9 @@ type InviteMessage struct {
 }
 
 type Relay interface {
-	Recv() (*messages.MessagePacket, error)
-	Send(Message) error
-	CommandTrigger() string
-	GetUsers() *users.UserList
-	OnUserJoin(func(user *messages.User, timestamp int64))
-	OnUserLeft(func(user *messages.User, timestamp int64))
-	Connect(nick string) error
+	Recv() (*domain.ChatMessage, error)
+	Send(message *domain.ClientMessage) error
+	OnUserJoin(func(user *domain.User, timestamp time.Time))
+	OnUserLeft(func(user *domain.User, timestamp time.Time))
+	Connect(nick string) (*domain.User, domain.UserList, error)
 }

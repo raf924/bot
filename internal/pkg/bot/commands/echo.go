@@ -2,10 +2,8 @@ package commands
 
 import (
 	"github.com/raf924/bot/pkg/bot/command"
-	messages "github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/raf924/bot/pkg/domain"
 	"strings"
-	"time"
 )
 
 type EchoCommand struct {
@@ -25,12 +23,7 @@ func (e *EchoCommand) Aliases() []string {
 	return []string{"e"}
 }
 
-func (e *EchoCommand) Execute(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
-	packet := &messages.BotPacket{
-		Timestamp: timestamppb.New(time.Now()),
-		Message:   strings.Join(command.Args, " "),
-		Recipient: nil,
-		Private:   false,
-	}
-	return []*messages.BotPacket{packet}, nil
+func (e *EchoCommand) Execute(command *domain.CommandMessage) ([]*domain.ClientMessage, error) {
+	packet := domain.NewClientMessage(strings.Join(command.Args(), " "), nil, command.Private())
+	return []*domain.ClientMessage{packet}, nil
 }
