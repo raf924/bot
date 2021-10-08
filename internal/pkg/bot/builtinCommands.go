@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
-	messages "github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/raf924/bot/pkg/domain"
 	"strconv"
 	"strings"
 	"time"
@@ -14,23 +13,23 @@ import (
 type builtinCommand struct {
 	command.NoOpCommand
 	name    string
-	execute func(command *messages.CommandPacket) ([]*messages.BotPacket, error)
+	execute func(command *domain.CommandMessage) ([]*domain.ClientMessage, error)
 }
 
 func (c *builtinCommand) Name() string {
 	return c.name
 }
 
-func (c *builtinCommand) Execute(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
+func (c *builtinCommand) Execute(command *domain.CommandMessage) ([]*domain.ClientMessage, error) {
 	return c.execute(command)
 }
 
-func (b *Bot) verifySender(command *messages.CommandPacket) bool {
-	return b.verifyId(command.User.Id)
+func (b *Bot) verifySender(command *domain.CommandMessage) bool {
+	return b.verifyId(command.Sender().Id())
 }
 
-func (b *Bot) verifyOther(command *messages.CommandPacket) bool {
-	id := command.Args[0]
+func (b *Bot) verifyOther(command *domain.CommandMessage) bool {
+	id := command.Args()[0]
 	return b.verifyId(id)
 }
 
@@ -42,10 +41,10 @@ func (b *Bot) verifyId(id string) bool {
 	return permission != permissions.UNKNOWN
 }
 
-func (b *Bot) verify(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
-	args := command.GetArgs()
+func (b *Bot) verify(command *domain.CommandMessage) ([]*domain.ClientMessage, error) {
+	args := command.Args()
 	op := args[len(args)-1]
-	packet := &messages.BotPacket{}
+	packet := &domain.ClientMessage{}
 	switch op {
 	case "add":
 	case "remove":
@@ -53,12 +52,12 @@ func (b *Bot) verify(command *messages.CommandPacket) ([]*messages.BotPacket, er
 	default:
 		//TODO: verify self, verify other: create validation struct with User and Valid
 	}
-	return []*messages.BotPacket{packet}, nil
+	return []*domain.ClientMessage{packet}, nil
 }
 
-func (b *Bot) ban(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
+func (b *Bot) ban(command *domain.CommandMessage) ([]*domain.ClientMessage, error) {
 	defer b.saveBans()
-	args := command.GetArgs()
+	args := command.Args()
 	if len(args) < 2 {
 		return nil, fmt.Errorf("missing args")
 	}
@@ -82,11 +81,6 @@ func (b *Bot) ban(command *messages.CommandPacket) ([]*messages.BotPacket, error
 	} else {
 		banEnd = banInfo.Start.Add(banInfo.Duration).UTC().String()
 	}
-	packet := &messages.BotPacket{
-		Timestamp: timestamppb.Now(),
-		Message:   fmt.Sprintf("@%s has been banned until %s", userToBan, banEnd),
-		Recipient: command.GetUser(),
-		Private:   command.GetPrivate(),
-	}
-	return []*messages.BotPacket{packet}, nil
+	packet := domain.NewClientMessage(fmt.Sprintf("@%s has been banned until %s", userToBan, banEnd), command.Sender(), command.Private())
+	return []*domain.ClientMessage{packet}, nil
 }

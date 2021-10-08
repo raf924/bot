@@ -2,8 +2,7 @@ package client
 
 import (
 	"github.com/raf924/bot/pkg/config/bot"
-	messages "github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/proto"
+	"github.com/raf924/bot/pkg/domain"
 )
 
 var connectorRelays = map[string]RelayBuilder{}
@@ -24,11 +23,7 @@ func GetRelayClient(config bot.Config) RelayClient {
 }
 
 type RelayClient interface {
-	GetUsers() []*messages.User
-	OnUserJoin(func(user *messages.User, timestamp int64))
-	OnUserLeft(func(user *messages.User, timestamp int64))
-	Connect(registration *messages.RegistrationPacket) (*messages.User, error)
-	Send(packet *messages.BotPacket) error
-	Recv() (proto.Message, error)
-	Done() <-chan struct{}
+	Connect(registration *domain.RegistrationMessage) (*domain.User, error)
+	Send(packet *domain.ClientMessage) error
+	Recv() (domain.ServerMessage, error)
 }

@@ -2,22 +2,22 @@ package command
 
 import (
 	"github.com/raf924/bot/pkg/bot/permissions"
-	messages "github.com/raf924/connector-api/pkg/gen"
+	"github.com/raf924/bot/pkg/domain"
 )
 
 type Executor interface {
-	BotUser() *messages.User
+	BotUser() *domain.User
 	ApiKeys() map[string]string
-	OnlineUsers() map[string]messages.User
-	UserHasPermission(user *messages.User, permission permissions.Permission) bool
+	OnlineUsers() domain.UserList
+	UserHasPermission(user *domain.User, permission permissions.Permission) bool
 	Trigger() string
 }
 
 type Interceptor interface {
 	// OnChat should be implemented if the command needs to handle chat messages as they arrive
-	OnChat(message *messages.MessagePacket) ([]*messages.BotPacket, error)
+	OnChat(message *domain.ChatMessage) ([]*domain.ClientMessage, error)
 	// OnUserEvent should be implemented if the command needs to handle user events
-	OnUserEvent(packet *messages.UserPacket) ([]*messages.BotPacket, error)
+	OnUserEvent(packet *domain.UserEvent) ([]*domain.ClientMessage, error)
 	// if IgnoreSelf no message sent by the bot is send to the command
 	IgnoreSelf() bool
 }
@@ -32,7 +32,7 @@ type Executable interface {
 	// Aliases should return a list of command aliases (excluding the string returned by Name) to be used in command recognition
 	Aliases() []string
 	// Execute is the core function of a command. It does the work when called.
-	Execute(command *messages.CommandPacket) ([]*messages.BotPacket, error)
+	Execute(command *domain.CommandMessage) ([]*domain.ClientMessage, error)
 }
 
 // A Command can either be triggered by its Name or Aliases with arguments or by chat events.
@@ -60,15 +60,15 @@ func (n *NoOpCommand) Aliases() []string {
 	return []string{}
 }
 
-func (n *NoOpCommand) Execute(_ *messages.CommandPacket) ([]*messages.BotPacket, error) {
+func (n *NoOpCommand) Execute(command *domain.CommandMessage) ([]*domain.ClientMessage, error) {
 	panic("implement me")
 }
 
-func (n *NoOpCommand) OnChat(_ *messages.MessagePacket) ([]*messages.BotPacket, error) {
+func (n *NoOpCommand) OnChat(message *domain.ChatMessage) ([]*domain.ClientMessage, error) {
 	return nil, nil
 }
 
-func (n *NoOpCommand) OnUserEvent(_ *messages.UserPacket) ([]*messages.BotPacket, error) {
+func (n *NoOpCommand) OnUserEvent(packet *domain.UserEvent) ([]*domain.ClientMessage, error) {
 	return nil, nil
 }
 
@@ -82,11 +82,11 @@ func (n *NoOpCommand) IgnoreSelf() bool {
 type NoOpInterceptor struct {
 }
 
-func (n *NoOpInterceptor) OnChat(_ *messages.MessagePacket) ([]*messages.BotPacket, error) {
+func (n *NoOpInterceptor) OnChat(message *domain.ChatMessage) ([]*domain.ClientMessage, error) {
 	return nil, nil
 }
 
-func (n *NoOpInterceptor) OnUserEvent(_ *messages.UserPacket) ([]*messages.BotPacket, error) {
+func (n *NoOpInterceptor) OnUserEvent(packet *domain.UserEvent) ([]*domain.ClientMessage, error) {
 	return nil, nil
 }
 

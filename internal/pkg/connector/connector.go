@@ -5,23 +5,16 @@ import (
 	"fmt"
 	"github.com/raf924/bot/pkg/command"
 	"github.com/raf924/bot/pkg/config/connector"
+	"github.com/raf924/bot/pkg/domain"
 	"github.com/raf924/bot/pkg/relay/connection"
 	"github.com/raf924/bot/pkg/relay/server"
-	"github.com/raf924/bot/pkg/users"
-	messages "github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	"sort"
 	"strings"
 	"time"
 )
 
-var helpCommand = &messages.Command{
-	Name:    "help",
-	Aliases: []string{"h"},
-	Usage:   "help",
-}
+var helpCommand = domain.NewCommand("help", []string{"h"}, "help")
 
 type Connector struct {
 	config          connector.Config
@@ -29,7 +22,7 @@ type Connector struct {
 	relayServer     server.RelayServer
 	context         context.Context
 	cancelFunc      context.CancelFunc
-	users           *users.UserList
+	users           domain.UserList
 }
 
 func (c *Connector) Deadline() (deadline time.Time, ok bool) {
@@ -48,15 +41,15 @@ func (c *Connector) Value(key interface{}) interface{} {
 	return c.context.Value(key)
 }
 
-func (c *Connector) getCommandOr(mP *messages.MessagePacket) proto.Message {
-	log.Printf("Message from %s: %s\n", mP.GetUser().GetNick(), mP.GetMessage())
+func (c *Connector) getCommandOr(mP *domain.ChatMessage) domain.ServerMessage {
+	log.Printf("Message from %s: %s\n", mP.Sender().Nick(), mP.Message())
 	if len(c.config.Trigger) == 0 {
 		return mP
 	}
-	if !strings.HasPrefix(mP.GetMessage(), c.config.Trigger) {
+	if !strings.HasPrefix(mP.Message(), c.config.Trigger) {
 		return mP
 	}
-	argString := strings.TrimPrefix(mP.GetMessage(), c.config.Trigger)
+	argString := strings.TrimPrefix(mP.Message(), c.config.Trigger)
 	args := strings.Split(argString, " ")
 	if len(args) == 0 || len(args[0]) == 0 {
 		return mP
@@ -64,71 +57,53 @@ func (c *Connector) getCommandOr(mP *messages.MessagePacket) proto.Message {
 	possibleCommand := args[0]
 	if command.Is(possibleCommand, helpCommand) {
 		var names []string
-		for _, cmd := range c.relayServer.Commands() {
-			names = append(names, fmt.Sprintf("%s%s", c.config.Trigger, cmd.GetName()))
-			for _, alias := range append(cmd.Aliases) {
-				names = append(names, fmt.Sprintf("%s%s (%s)", c.config.Trigger, alias, cmd.GetName()))
+		for _, cmd := range c.relayServer.Commands().All() {
+			names = append(names, fmt.Sprintf("%s%s", c.config.Trigger, cmd.Name()))
+			for _, alias := range append(cmd.Aliases()) {
+				names = append(names, fmt.Sprintf("%s%s (%s)", c.config.Trigger, alias, cmd.Name()))
 			}
 		}
 		sort.Strings(names)
-		err := c.sendToConnection(connection.ChatMessage{
-			Message:   strings.Join(names, ", "),
-			Recipient: mP.GetUser().GetNick(),
-			Private:   mP.GetPrivate(),
-		})
+		err := c.sendToConnection(domain.NewClientMessage(strings.Join(names, ", "), mP.Sender(), mP.Private()))
 		if err != nil {
 			panic(err)
 		}
 		return nil
 	}
-	cmd := command.Find(c.relayServer.Commands(), possibleCommand)
+	cmd := c.relayServer.Commands().Find(possibleCommand)
 	if cmd == nil {
 		return mP
 	}
 	argString = strings.TrimSpace(strings.TrimPrefix(argString, possibleCommand))
-	return &messages.CommandPacket{
-		Timestamp: mP.GetTimestamp(),
-		Command:   cmd.GetName(),
-		Args:      args[1:],
-		ArgString: argString,
-		User:      mP.GetUser(),
-		Private:   mP.GetPrivate(),
-	}
+	return domain.NewCommandMessage(cmd.Name(), args[1:], argString, mP.Sender(), mP.Private(), mP.Timestamp())
 }
 
 func (c *Connector) Start() error {
 	c.context, c.cancelFunc = context.WithCancel(context.Background())
-	c.connectionRelay.OnUserJoin(func(user *messages.User, timestamp int64) {
-		c.users = c.connectionRelay.GetUsers()
-		err := c.relayServer.Send(&messages.UserPacket{
-			Timestamp: timestamppb.New(time.Unix(timestamp, 0)),
-			User:      user,
-			Event:     messages.UserEvent_JOINED,
-		})
+	c.connectionRelay.OnUserJoin(func(user *domain.User, timestamp time.Time) {
+		err := c.relayServer.Send(domain.NewUserEvent(user, domain.UserJoined, timestamp))
 		if err != nil {
 			log.Println(err)
 		}
 	})
-	c.connectionRelay.OnUserLeft(func(user *messages.User, timestamp int64) {
-		c.users = c.connectionRelay.GetUsers()
-		err := c.relayServer.Send(&messages.UserPacket{
-			Timestamp: timestamppb.New(time.Unix(timestamp, 0)),
-			User:      user,
-			Event:     messages.UserEvent_LEFT,
-		})
+	c.connectionRelay.OnUserLeft(func(user *domain.User, timestamp time.Time) {
+		err := c.relayServer.Send(domain.NewUserEvent(user, domain.UserLeft, timestamp))
 		if err != nil {
 			log.Println(err)
 		}
 	})
-	err := c.connectionRelay.Connect(c.config.Name)
+	u, users, err := c.connectionRelay.Connect(c.config.Name)
 	if err != nil {
 		return err
 	}
-	u := c.connectionRelay.GetUsers().Find(c.config.Name)
+	c.users = domain.ImmutableUserList(users)
+	if u == nil {
+		u = c.users.Find(c.config.Name)
+	}
 	if u == nil {
 		return fmt.Errorf("couldn't find connector among users")
 	}
-	err = c.relayServer.Start(u, c.connectionRelay.GetUsers().All(), c.config.Trigger)
+	err = c.relayServer.Start(u, c.users, c.config.Trigger)
 	if err != nil {
 		return err
 	}
@@ -158,18 +133,7 @@ func (c *Connector) Start() error {
 				log.Println(err)
 				continue
 			}
-			if packet.Timestamp == nil {
-				continue
-			}
-			recipient := ""
-			if packet.Recipient != nil {
-				recipient = packet.Recipient.Nick
-			}
-			err = c.sendToConnection(connection.ChatMessage{
-				Message:   packet.Message,
-				Recipient: recipient,
-				Private:   packet.Private,
-			})
+			err = c.sendToConnection(packet)
 			if err != nil {
 				c.cancelFunc()
 				return
@@ -179,19 +143,19 @@ func (c *Connector) Start() error {
 	return nil
 }
 
-func (c *Connector) receiveFromRelayServer() (*messages.BotPacket, error) {
+func (c *Connector) receiveFromRelayServer() (*domain.ClientMessage, error) {
 	return c.relayServer.Recv()
 }
 
-func (c *Connector) receiveFromConnection() (*messages.MessagePacket, error) {
+func (c *Connector) receiveFromConnection() (*domain.ChatMessage, error) {
 	return c.connectionRelay.Recv()
 }
 
-func (c *Connector) sendToServer(m proto.Message) error {
+func (c *Connector) sendToServer(m domain.ServerMessage) error {
 	return c.relayServer.Send(m)
 }
 
-func (c *Connector) sendToConnection(m connection.Message) error {
+func (c *Connector) sendToConnection(m *domain.ClientMessage) error {
 	return c.connectionRelay.Send(m)
 }
 

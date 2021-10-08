@@ -1,15 +1,15 @@
 package command
 
 import (
-	"github.com/raf924/connector-api/pkg/gen"
+	"github.com/raf924/bot/pkg/domain"
 	"sort"
 )
 
-func Is(possibleCommand string, cmd *gen.Command) bool {
-	if possibleCommand == cmd.GetName() {
+func Is(possibleCommand string, cmd *domain.Command) bool {
+	if possibleCommand == cmd.Name() {
 		return true
 	}
-	aliases := cmd.GetAliases()
+	aliases := cmd.Aliases()
 	if len(aliases) == 0 {
 		return false
 	}
@@ -21,7 +21,7 @@ func Is(possibleCommand string, cmd *gen.Command) bool {
 	return false
 }
 
-func Find(commands []*gen.Command, possibleCommand string) *gen.Command {
+func Find(commands []*domain.Command, possibleCommand string) *domain.Command {
 	for _, cmd := range commands {
 		if Is(possibleCommand, cmd) {
 			return cmd

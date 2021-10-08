@@ -2,8 +2,7 @@ package server
 
 import (
 	"github.com/raf924/bot/pkg/config/connector"
-	messages "github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/proto"
+	"github.com/raf924/bot/pkg/domain"
 )
 
 var relayServers = map[string]RelayServerBuilder{}
@@ -24,8 +23,8 @@ func GetRelayServer(config connector.Config) RelayServer {
 }
 
 type RelayServer interface {
-	Start(botUser *messages.User, users []*messages.User, trigger string) error
-	Commands() []*messages.Command
-	Send(message proto.Message) error
-	Recv() (*messages.BotPacket, error)
+	Start(botUser *domain.User, onlineUsers domain.UserList, trigger string) error
+	Commands() domain.CommandList
+	Send(message domain.ServerMessage) error
+	Recv() (*domain.ClientMessage, error)
 }

@@ -2,105 +2,74 @@ package connector
 
 import (
 	"github.com/raf924/bot/pkg/config/connector"
+	"github.com/raf924/bot/pkg/domain"
 	"github.com/raf924/bot/pkg/relay/connection"
-	"github.com/raf924/bot/pkg/users"
-	messages "github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/raf924/bot/pkg/relay/server"
 	"testing"
+	"time"
 )
+
+var _ server.RelayServer = (*dummyServer)(nil)
 
 type dummyServer struct {
 }
 
-func (d *dummyServer) Send(message proto.Message) error {
+func (d *dummyServer) Send(message domain.ServerMessage) error {
 	panic("implement me")
 }
 
-func (d *dummyServer) Recv() (*messages.BotPacket, error) {
+func (d *dummyServer) Recv() (*domain.ClientMessage, error) {
 	panic("implement me")
 }
 
-func (d *dummyServer) Start(botUser *messages.User, users []*messages.User, trigger string) error {
+func (d *dummyServer) Start(botUser *domain.User, onlineUsers domain.UserList, trigger string) error {
 	return nil
 }
 
-func (d *dummyServer) Commands() []*messages.Command {
-	return []*messages.Command{
-		{Name: "echo",
-			Aliases: nil,
-			Usage:   ""},
-		{
-			Name:    "test",
-			Aliases: []string{"t"},
-			Usage:   "",
-		},
-	}
+func (d *dummyServer) Commands() domain.CommandList {
+	return domain.NewCommandList(
+		domain.NewCommand("echo", nil, ""),
+		domain.NewCommand("test", []string{"t"}, ""),
+	)
 }
+
+var _ connection.Relay = (*dummyConnection)(nil)
 
 type dummyConnection struct {
-	users *users.UserList
+	users domain.UserList
 }
 
-func (d *dummyConnection) Recv() (*messages.MessagePacket, error) {
+func (d *dummyConnection) Recv() (*domain.ChatMessage, error) {
 	panic("implement me")
 }
 
-func (d *dummyConnection) Send(message connection.Message) error {
+func (d *dummyConnection) Send(message *domain.ClientMessage) error {
 	panic("implement me")
 }
 
-func (d *dummyConnection) Start() error {
-	return nil
-}
-
-func (d *dummyConnection) CommandTrigger() string {
-	return "!"
-}
-
-func (d *dummyConnection) GetUsers() *users.UserList {
-	return d.users.Copy()
-}
-
-func (d *dummyConnection) OnUserJoin(f func(user *messages.User, timestamp int64)) {
+func (d *dummyConnection) OnUserJoin(f func(user *domain.User, timestamp time.Time)) {
 
 }
 
-func (d *dummyConnection) OnUserLeft(f func(user *messages.User, timestamp int64)) {
+func (d *dummyConnection) OnUserLeft(f func(user *domain.User, timestamp time.Time)) {
 
 }
 
-func (d *dummyConnection) Connect(nick string) error {
-	return nil
+func (d *dummyConnection) Connect(nick string) (*domain.User, domain.UserList, error) {
+	return domain.NewUser(nick, "", domain.RegularUser), d.users, nil
 }
 
 func TestConnector(t *testing.T) {
-	cr := NewConnector(connector.Config{Name: "raf924", Bot: nil, Connection: nil}, &dummyConnection{
-		users: users.NewUserList(&messages.User{
-			Nick:  "test",
-			Id:    "id",
-			Mod:   false,
-			Admin: false,
-		}, &messages.User{
-			Nick: "raf924",
-		}),
+	//TODO: rewrite
+	cr := NewConnector(connector.Config{Name: "test", Bot: nil, Connection: nil}, &dummyConnection{
+		users: domain.NewUserList(domain.NewUser("test", "id", domain.RegularUser), domain.NewUser("nick2", "id2", domain.RegularUser)),
 	}, &dummyServer{})
 	err := cr.Start()
 	if err != nil {
 		t.Errorf("unexpected error = %v", err)
 		return
 	}
-	sentPacket := &messages.MessagePacket{
-		Timestamp: timestamppb.Now(),
-		Message:   "Hello",
-		User: &messages.User{
-			Nick:  "test",
-			Id:    "id",
-			Mod:   false,
-			Admin: false,
-		},
-		Private: false,
-	}
+	sentPacket := domain.NewChatMessage("Hello", domain.NewUser("test", "id", domain.RegularUser), nil, false, false, time.Now(), true)
 	go func() {
 		err = cr.sendToServer(sentPacket)
 		if err != nil {
@@ -110,20 +79,15 @@ func TestConnector(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected errror := %v", err)
 		}
-		if m.GetMessage() != sentPacket.GetMessage() {
-			t.Errorf("expected message %v got %v", sentPacket.GetMessage(), m.GetMessage())
+		if m.Message() != sentPacket.Message() {
+			t.Errorf("expected message %v got %v", sentPacket.Message(), m.Message())
 		}
 
-		packetFromBot := &messages.BotPacket{
-			Timestamp: sentPacket.GetTimestamp(),
-			Message:   sentPacket.GetMessage(),
-			Recipient: sentPacket.GetUser(),
-			Private:   sentPacket.GetPrivate(),
-		}
+		packetFromBot := domain.NewClientMessage(sentPacket.Message(), sentPacket.Sender(), sentPacket.Private())
 		_ = packetFromBot
 		var cm connection.ChatMessage
-		if cm.Message != sentPacket.GetMessage() {
-			t.Errorf("expected message %v got %v", sentPacket.GetMessage(), cm.Message)
+		if cm.Message != sentPacket.Message() {
+			t.Errorf("expected message %v got %v", sentPacket.Message(), cm.Message)
 		}
 	}()
 	<-cr.Done()

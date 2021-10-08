@@ -1,8 +1,7 @@
 package queue
 
 import (
-	"github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/raf924/bot/pkg/domain"
 	"math/rand"
 	"sync"
 	"testing"
@@ -31,17 +30,7 @@ var intBenchmark = typeBenchmark{
 
 var messagePacketBenchmark = typeBenchmark{
 	vGen: valueGeneratorFunc(func() interface{} {
-		return &gen.MessagePacket{
-			Timestamp: timestamppb.New(time.Now()),
-			Message:   "Hello there",
-			User: &gen.User{
-				Nick:  "Test",
-				Id:    "test",
-				Mod:   false,
-				Admin: false,
-			},
-			Private: false,
-		}
+		return domain.NewChatMessage("Hello there", domain.NewUser("Test", "test", domain.RegularUser), nil, false, false, time.Now(), false)
 	}),
 }
 
@@ -49,21 +38,11 @@ func TestProtoMessage(t *testing.T) {
 	var q = NewQueue()
 	p, _ := q.NewProducer()
 	c, _ := q.NewConsumer()
-	_ = p.Produce(&gen.MessagePacket{
-		Timestamp: timestamppb.Now(),
-		Message:   "test",
-		User: &gen.User{
-			Nick:  "user",
-			Id:    "id",
-			Mod:   false,
-			Admin: false,
-		},
-		Private: false,
-	})
+	_ = p.Produce(domain.NewChatMessage("test", domain.NewUser("user", "id", domain.RegularUser), nil, false, false, time.Now(), false))
 	var pm interface{}
 	pm, _ = c.Consume()
 	switch pm.(type) {
-	case *gen.MessagePacket:
+	case *domain.ChatMessage:
 	default:
 		t.Errorf("expected MessagePacket, got %v", pm)
 	}

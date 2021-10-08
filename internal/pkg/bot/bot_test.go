@@ -4,50 +4,31 @@ import (
 	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/config/bot"
-	messages "github.com/raf924/connector-api/pkg/gen"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/raf924/bot/pkg/domain"
 	"testing"
+	"time"
 )
 
-var botUser = &messages.User{
-	Nick:  "bot",
-	Id:    "id",
-	Mod:   false,
-	Admin: false,
-}
+var botUser = domain.NewUser("bot", "id", domain.RegularUser)
 
-var user = &messages.User{
-	Nick:  "user",
-	Id:    "userId",
-	Mod:   false,
-	Admin: false,
-}
+var user = domain.NewUser("user", "userId", domain.RegularUser)
 
 type dummyRelay struct {
 }
 
-func (d *dummyRelay) Send(packet *messages.BotPacket) error {
+func (d *dummyRelay) Send(packet *domain.ClientMessage) error {
 	panic("implement me")
 }
 
-func (d *dummyRelay) Recv() (proto.Message, error) {
+func (d *dummyRelay) Recv() (domain.ServerMessage, error) {
 	panic("implement me")
 }
 
-func (d *dummyRelay) GetUsers() []*messages.User {
-	return []*messages.User{botUser, user}
+func (d *dummyRelay) GetUsers() []*domain.User {
+	return []*domain.User{botUser, user}
 }
 
-func (d *dummyRelay) OnUserJoin(f func(user *messages.User, timestamp int64)) {
-
-}
-
-func (d *dummyRelay) OnUserLeft(f func(user *messages.User, timestamp int64)) {
-
-}
-
-func (d *dummyRelay) Connect(registration *messages.RegistrationPacket) (*messages.User, error) {
+func (d *dummyRelay) Connect(registration *domain.RegistrationMessage) (*domain.User, error) {
 	return botUser, nil
 }
 
@@ -68,9 +49,9 @@ func (d *dummyPermissionManager) SetPermission(id string, permission permissions
 
 type testCommand struct {
 	init        func(executor command.Executor) error
-	execute     func(packet *messages.CommandPacket) ([]*messages.BotPacket, error)
-	onChat      func(packet *messages.MessagePacket) ([]*messages.BotPacket, error)
-	onUserEvent func(packet *messages.UserPacket) ([]*messages.BotPacket, error)
+	execute     func(packet *domain.CommandMessage) ([]*domain.ClientMessage, error)
+	onChat      func(packet *domain.ChatMessage) ([]*domain.ClientMessage, error)
+	onUserEvent func(packet *domain.UserEvent) ([]*domain.ClientMessage, error)
 	ignoreSelf  bool
 }
 
@@ -86,15 +67,15 @@ func (t *testCommand) Aliases() []string {
 	return []string{"t"}
 }
 
-func (t *testCommand) Execute(command *messages.CommandPacket) ([]*messages.BotPacket, error) {
+func (t *testCommand) Execute(command *domain.CommandMessage) ([]*domain.ClientMessage, error) {
 	return t.execute(command)
 }
 
-func (t *testCommand) OnChat(message *messages.MessagePacket) ([]*messages.BotPacket, error) {
+func (t *testCommand) OnChat(message *domain.ChatMessage) ([]*domain.ClientMessage, error) {
 	return t.onChat(message)
 }
 
-func (t *testCommand) OnUserEvent(packet *messages.UserPacket) ([]*messages.BotPacket, error) {
+func (t *testCommand) OnUserEvent(packet *domain.UserEvent) ([]*domain.ClientMessage, error) {
 	return t.onUserEvent(packet)
 }
 
@@ -102,28 +83,13 @@ func (t *testCommand) IgnoreSelf() bool {
 	return t.ignoreSelf
 }
 
-var commandReply = &messages.BotPacket{
-	Timestamp: timestamppb.Now(),
-	Message:   "command",
-	Recipient: user,
-	Private:   false,
-}
+var commandReply = domain.NewClientMessage("command", user, false)
 
-var messageReply = &messages.BotPacket{
-	Timestamp: timestamppb.Now(),
-	Message:   "message",
-	Recipient: user,
-	Private:   false,
-}
+var messageReply = domain.NewClientMessage("message", user, false)
 
-var userEventReply = &messages.BotPacket{
-	Timestamp: timestamppb.Now(),
-	Message:   "userEvent",
-	Recipient: user,
-	Private:   false,
-}
+var userEventReply = domain.NewClientMessage("userEvent", user, false)
 
-func testReply(t testing.TB, p proto.Message, expectedReply *messages.BotPacket) {
+func testReply(t testing.TB, p domain.ServerMessage, expectedReply *domain.ClientMessage) {
 	err := WithBotExchange.Produce(p)
 	if err != nil {
 		t.Fatalf("unexpected error = %v", err)
@@ -135,9 +101,9 @@ func testReply(t testing.TB, p proto.Message, expectedReply *messages.BotPacket)
 
 	var gotReply = bp
 
-	switch gotReply.(type) {
-	case *messages.BotPacket:
-		if gotReply.(*messages.BotPacket).String() != expectedReply.String() {
+	switch gotReply := gotReply.(type) {
+	case *domain.ClientMessage:
+		if gotReply != expectedReply {
 			t.Errorf("expected %v got %v", expectedReply, gotReply)
 		}
 	default:
@@ -164,18 +130,18 @@ func TestBot(t *testing.T) {
 		init: func(executor command.Executor) error {
 			return nil
 		},
-		execute: func(packet *messages.CommandPacket) ([]*messages.BotPacket, error) {
-			return []*messages.BotPacket{
+		execute: func(packet *domain.CommandMessage) ([]*domain.ClientMessage, error) {
+			return []*domain.ClientMessage{
 				commandReply,
 			}, nil
 		},
-		onChat: func(packet *messages.MessagePacket) ([]*messages.BotPacket, error) {
-			return []*messages.BotPacket{
+		onChat: func(packet *domain.ChatMessage) ([]*domain.ClientMessage, error) {
+			return []*domain.ClientMessage{
 				messageReply,
 			}, nil
 		},
-		onUserEvent: func(packet *messages.UserPacket) ([]*messages.BotPacket, error) {
-			return []*messages.BotPacket{
+		onUserEvent: func(packet *domain.UserEvent) ([]*domain.ClientMessage, error) {
+			return []*domain.ClientMessage{
 				userEventReply,
 			}, nil
 		},
@@ -185,23 +151,7 @@ func TestBot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error = %v", err)
 	}
-	testReply(t, &messages.MessagePacket{
-		Timestamp: timestamppb.Now(),
-		Message:   "test",
-		User:      user,
-		Private:   false,
-	}, messageReply)
-	testReply(t, &messages.CommandPacket{
-		Timestamp: timestamppb.Now(),
-		Command:   "test",
-		Args:      nil,
-		User:      user,
-		Private:   false,
-		ArgString: "",
-	}, commandReply)
-	testReply(t, &messages.UserPacket{
-		Timestamp: timestamppb.Now(),
-		User:      user,
-		Event:     0,
-	}, userEventReply)
+	testReply(t, domain.NewChatMessage("test", user, nil, false, false, time.Now(), true), messageReply)
+	testReply(t, domain.NewCommandMessage("test", nil, "", user, false, time.Now()), commandReply)
+	testReply(t, domain.NewUserEvent(user, domain.UserJoined, time.Now()), userEventReply)
 }
