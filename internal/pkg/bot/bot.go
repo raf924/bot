@@ -135,7 +135,7 @@ func (b *Bot) getCommandList() []*domain.Command {
 		if b.isCommandDisabled(cmd) {
 			continue
 		}
-		commands = append(commands, domain.NewCommand(cmd.Name(), cmd.Aliases(), fmt.Sprintf("%s%s <args>", b.config.Trigger, cmd.Name())))
+		commands = append(commands, domain.NewCommand(cmd.Name(), cmd.Aliases(), fmt.Sprintf("%s%s <args>", b.trigger, cmd.Name())))
 	}
 	return commands
 }
@@ -193,7 +193,7 @@ func (b *Bot) Start() error {
 	b.initCommands()
 	confirmation, err := b.connectorRelay.Connect(domain.NewRegistrationMessage(b.getCommandList()))
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot connect to server: %v", err)
 	}
 	b.botUser = confirmation.CurrentUser()
 	b.users = confirmation.Users()
