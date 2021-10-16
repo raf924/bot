@@ -247,43 +247,46 @@ func (b *Bot) relayBotPackets(cmd command.Command, commandConsumer *queue.Consum
 			return err
 		}
 		var packets []*domain.ClientMessage
-		var sender = m.(FromUser).Sender()
-		if sender.Nick() == b.botUser.Nick() && cmd.IgnoreSelf() {
-			log.Println("Command", cmd.Name(), "ignored message from self")
-			continue
-		}
-		if !b.isAllowed(cmd.Name(), sender) {
-			log.Println(sender.Nick(), "is not allowed to use", cmd.Name())
-			continue
-		}
-		switch message := m.(type) {
-		case *domain.ChatMessage:
-			packets, err = cmd.OnChat(message)
-			if err != nil {
-				log.Println("Command", cmd.Name(), "OnChat error:", err.Error())
-			}
-		case *domain.CommandMessage:
-			if b.isBanned(message.Sender()) {
-				continue
-			}
-			if _, isCmd := cmdAliases[message.Command()]; !isCmd {
-				packets, err = cmd.OnChat(message.ToChatMessage())
-				if err != nil {
-					log.Println("Command", cmd.Name(), "OnChat error:", err.Error())
-				}
-			} else {
-				packets, err = cmd.Execute(message)
-				if err != nil {
-					log.Println("Command", cmd.Name(), "Execute error:", err.Error())
-				}
-			}
-		case *domain.UserEvent:
-			packets, err = cmd.OnUserEvent(message)
+		if event, ok := m.(*domain.UserEvent); ok {
+			packets, err = cmd.OnUserEvent(event)
 			if err != nil {
 				log.Println("Command", cmd.Name(), "OnUserEvent error:", err.Error())
 			}
+		} else {
+			var sender = m.(FromUser).Sender()
+			if sender.Nick() == b.botUser.Nick() && cmd.IgnoreSelf() {
+				log.Println("Command", cmd.Name(), "ignored message from self")
+				continue
+			}
+			if !b.isAllowed(cmd.Name(), sender) {
+				log.Println(sender.Nick(), "is not allowed to use", cmd.Name())
+				continue
+			}
+			switch message := m.(type) {
+			case *domain.ChatMessage:
+				packets, err = cmd.OnChat(message)
+				if err != nil {
+					log.Println("Command", cmd.Name(), "OnChat error:", err.Error())
+				}
+			case *domain.CommandMessage:
+				if b.isBanned(message.Sender()) {
+					continue
+				}
+				if _, isCmd := cmdAliases[message.Command()]; !isCmd {
+					packets, err = cmd.OnChat(message.ToChatMessage())
+					if err != nil {
+						log.Println("Command", cmd.Name(), "OnChat error:", err.Error())
+					}
+				} else {
+					packets, err = cmd.Execute(message)
+					if err != nil {
+						log.Println("Command", cmd.Name(), "Execute error:", err.Error())
+					}
+				}
+			}
 		}
 		if err != nil {
+			log.Println("Bot", "relayBotPackets", cmd.Name(), "couldn't process message", err)
 			continue
 		}
 		for _, packet := range packets {

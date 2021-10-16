@@ -13,6 +13,8 @@ func RegisterRelayClient(key string, relayBuilder RelayBuilder) {
 	connectorRelays[key] = relayBuilder
 }
 
+var _ = RegisterRelayClient
+
 func GetRelayClient(config bot.Config) RelayClient {
 	for key, config := range config.Connector {
 		if builder, ok := connectorRelays[key]; ok {
@@ -26,4 +28,6 @@ type RelayClient interface {
 	Connect(registration *domain.RegistrationMessage) (*domain.ConfirmationMessage, error)
 	Send(packet *domain.ClientMessage) error
 	Recv() (domain.ServerMessage, error)
+	Done() <-chan struct{}
+	Err() error
 }

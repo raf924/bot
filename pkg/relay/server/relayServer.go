@@ -13,6 +13,8 @@ func RegisterRelayServer(name string, relayBuilder RelayServerBuilder) {
 	relayServers[name] = relayBuilder
 }
 
+var _ = RegisterRelayServer
+
 func GetRelayServer(config connector.Config) RelayServer {
 	for key, config := range config.Bot {
 		if builder, ok := relayServers[key]; ok {
@@ -27,4 +29,6 @@ type RelayServer interface {
 	Commands() domain.CommandList
 	Send(message domain.ServerMessage) error
 	Recv() (*domain.ClientMessage, error)
+	Done() <-chan struct{}
+	Err() error
 }
