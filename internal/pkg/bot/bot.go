@@ -9,7 +9,6 @@ import (
 	"github.com/raf924/bot/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/config/bot"
 	"github.com/raf924/bot/pkg/domain"
-	"github.com/raf924/bot/pkg/queue"
 	"github.com/raf924/bot/pkg/relay/client"
 	"github.com/raf924/bot/pkg/storage"
 	"log"
@@ -32,13 +31,12 @@ type Bot struct {
 	commands                 []command.Command
 	config                   bot.Config
 	botUser                  *domain.User
-	userPermissionManager    permissions.PermissionManager
 	bans                     map[string]ban
+	userPermissionManager    permissions.PermissionManager
 	commandPermissionManager permissions.PermissionManager
 	ctx                      context.Context
 	err                      error
 	cancelFunc               context.CancelFunc
-	commandQueue             queue.Queue
 	banStorage               storage.Storage
 	errorChan                chan error
 	trigger                  string
@@ -71,10 +69,6 @@ func (b *Bot) Err() error {
 	return b.err
 }
 
-func (b *Bot) Value(key interface{}) interface{} {
-	return b.ctx.Value(key)
-}
-
 func NewBot(
 	config bot.Config,
 	userPermissionManager permissions.PermissionManager,
@@ -96,7 +90,6 @@ func NewBot(
 		commandPermissionManager: commandPermissionManager,
 		userPermissionManager:    userPermissionManager,
 		connectorRelay:           relay,
-		commandQueue:             queue.NewQueue(),
 		banStorage:               banStorage,
 	}
 }
@@ -162,33 +155,18 @@ func (b *Bot) initCommands() {
 			b.disable(cmd)
 		}
 		b.AddCommand(cmd)
-		consumer, err := b.commandQueue.NewConsumer()
-		if err != nil {
-			log.Printf("couldn't init %s\n", cmd.Name())
-			b.disable(cmd)
-			continue
-		}
-		cmdContext, cmdCancel := context.WithCancel(b.ctx)
-		go func(consumer *queue.Consumer) {
-			<-cmdContext.Done()
-			consumer.Cancel()
-		}(consumer)
-		go func(cmd command.Command) {
-			err := b.relayBotPackets(cmd, consumer)
-			if err != nil {
-				log.Println("command", cmd.Name(), "disabled:", err.Error())
-				b.disable(cmd)
-			}
-			cmdCancel()
-		}(cmd)
 	}
 }
 
 func (b *Bot) Start() error {
 	b.ctx, b.cancelFunc = context.WithCancel(context.Background())
+	go func() {
+		b.err = <-b.errorChan
+		b.cancelFunc()
+	}()
 	b.loadBans()
-	var err error
 	b.initCommands()
+	var err error
 	confirmation, err := b.connectorRelay.Connect(domain.NewRegistrationMessage(b.getCommandList()))
 	if err != nil {
 		return fmt.Errorf("cannot connect to server: %v", err)
@@ -196,13 +174,30 @@ func (b *Bot) Start() error {
 	b.botUser = confirmation.CurrentUser()
 	b.users = confirmation.Users()
 	b.trigger = confirmation.Trigger()
-	go func() {
-		b.err = <-b.errorChan
-		b.cancelFunc()
-	}()
-	commandProducer, err := b.commandQueue.NewProducer()
-	if err != nil {
-		return err
+	commandHandler := CommandHandler{
+		commands:       domain.ImmutableCommandList(domain.NewCommandList(b.getCommandList()...)),
+		loadedCommands: b.loadedCommands,
+		botUser:        b.botUser,
+		commandCallback: func(messages []*domain.ClientMessage, err error) error {
+			if b.err != nil {
+				return fmt.Errorf("bot is down: %v", b.err)
+			}
+			if err != nil {
+				log.Println("error running command", err)
+				return nil
+			}
+			for _, message := range messages {
+				go func(message *domain.ClientMessage) {
+					err := b.connectorRelay.Send(message)
+					if err != nil {
+						b.errorChan <- err
+					}
+				}(message)
+			}
+			return nil
+		},
+		userPermissionManager:    b.userPermissionManager,
+		commandPermissionManager: b.commandPermissionManager,
 	}
 	go func() {
 		for {
@@ -220,10 +215,16 @@ func (b *Bot) Start() error {
 					b.users.Remove(packet.User())
 				}
 			}
-			if err = commandProducer.Produce(packet); err != nil {
-				b.errorChan <- err
-				return
-			}
+			go func() {
+				senderIsBanned := false
+				if packet, ok := packet.(FromUser); ok {
+					senderIsBanned = b.isBanned(packet.Sender())
+				}
+				if err = commandHandler.PassServerMessage(packet, senderIsBanned); err != nil {
+					b.errorChan <- err
+					return
+				}
+			}()
 		}
 	}()
 	return nil
@@ -231,80 +232,6 @@ func (b *Bot) Start() error {
 
 type FromUser interface {
 	Sender() *domain.User
-}
-
-func (b *Bot) relayBotPackets(cmd command.Command, commandConsumer *queue.Consumer) error {
-	cmdAliases := map[string]struct{}{cmd.Name(): {}}
-	for _, s := range cmd.Aliases() {
-		cmdAliases[s] = struct{}{}
-	}
-	for {
-		m, err := commandConsumer.Consume()
-		if err != nil {
-			return err
-		}
-		var packets []*domain.ClientMessage
-		if event, ok := m.(*domain.UserEvent); ok {
-			packets, err = cmd.OnUserEvent(event)
-			if err != nil {
-				log.Println("Command", cmd.Name(), "OnUserEvent error:", err.Error())
-			}
-		} else {
-			var sender = m.(FromUser).Sender()
-			if sender.Nick() == b.botUser.Nick() && cmd.IgnoreSelf() {
-				log.Println("Command", cmd.Name(), "ignored message from self")
-				continue
-			}
-			if !b.isAllowed(cmd.Name(), sender) {
-				log.Println(sender.Nick(), "is not allowed to use", cmd.Name())
-				continue
-			}
-			switch message := m.(type) {
-			case *domain.ChatMessage:
-				packets, err = cmd.OnChat(message)
-				if err != nil {
-					log.Println("Command", cmd.Name(), "OnChat error:", err.Error())
-				}
-			case *domain.CommandMessage:
-				if b.isBanned(message.Sender()) {
-					continue
-				}
-				if _, isCmd := cmdAliases[message.Command()]; !isCmd {
-					packets, err = cmd.OnChat(message.ToChatMessage())
-					if err != nil {
-						log.Println("Command", cmd.Name(), "OnChat error:", err.Error())
-					}
-				} else {
-					packets, err = cmd.Execute(message)
-					if err != nil {
-						log.Println("Command", cmd.Name(), "Execute error:", err.Error())
-					}
-				}
-			}
-		}
-		if err != nil {
-			log.Println("Bot", "relayBotPackets", cmd.Name(), "couldn't process message", err)
-			continue
-		}
-		for _, packet := range packets {
-			err := b.connectorRelay.Send(packet)
-			if err != nil {
-				return err
-			}
-		}
-	}
-}
-
-func (b *Bot) isAllowed(command string, user *domain.User) bool {
-	uPermission, err := b.userPermissionManager.GetPermission(user.Id())
-	if err != nil {
-		return false
-	}
-	cPermission, err := b.commandPermissionManager.GetPermission(command)
-	if err != nil {
-		return false
-	}
-	return uPermission.Has(cPermission)
 }
 
 func (b *Bot) isBanned(user *domain.User) bool {
