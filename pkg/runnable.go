@@ -1,8 +1,7 @@
 package pkg
 
-import "context"
-
 type Runnable interface {
-	context.Context
 	Start() error
+	Done() <-chan struct{}
+	Err() error
 }

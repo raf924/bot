@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"github.com/raf924/bot/pkg"
 	"github.com/raf924/bot/pkg/command"
 	"github.com/raf924/bot/pkg/config/connector"
 	"github.com/raf924/bot/pkg/domain"
@@ -25,9 +26,7 @@ type Connector struct {
 	users           domain.UserList
 }
 
-func (c *Connector) Deadline() (deadline time.Time, ok bool) {
-	return time.Time{}, false
-}
+var _ pkg.Runnable = (*Connector)(nil)
 
 func (c *Connector) Done() <-chan struct{} {
 	return c.context.Done()

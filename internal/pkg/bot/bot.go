@@ -17,7 +17,6 @@ import (
 )
 
 var _ pkg.Runnable = (*Bot)(nil)
-var _ context.Context = (*Bot)(nil)
 
 var Commands []command.Command
 
@@ -37,6 +36,7 @@ type Bot struct {
 	bans                     map[string]ban
 	commandPermissionManager permissions.PermissionManager
 	ctx                      context.Context
+	err                      error
 	cancelFunc               context.CancelFunc
 	commandQueue             queue.Queue
 	banStorage               storage.Storage
@@ -61,16 +61,15 @@ func (b *Bot) OnlineUsers() domain.UserList {
 	return users
 }
 
-func (b *Bot) Deadline() (deadline time.Time, ok bool) {
-	return time.Time{}, false
-}
-
 func (b *Bot) Done() <-chan struct{} {
 	return b.ctx.Done()
 }
 
 func (b *Bot) Err() error {
-	return b.ctx.Err()
+	if b.err == nil {
+		return b.ctx.Err()
+	}
+	return b.err
 }
 
 func (b *Bot) Value(key interface{}) interface{} {
@@ -199,8 +198,7 @@ func (b *Bot) Start() error {
 	b.users = confirmation.Users()
 	b.trigger = confirmation.Trigger()
 	go func() {
-		err := <-b.errorChan
-		log.Println(err)
+		b.err = <-b.errorChan
 		b.cancelFunc()
 	}()
 	commandProducer, err := b.commandQueue.NewProducer()
