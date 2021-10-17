@@ -57,8 +57,7 @@ func (b *Bot) UserHasPermission(user *domain.User, permission permissions.Permis
 }
 
 func (b *Bot) OnlineUsers() domain.UserList {
-	users := b.users
-	return users
+	return domain.ImmutableUserList(b.users)
 }
 
 func (b *Bot) Done() <-chan struct{} {
