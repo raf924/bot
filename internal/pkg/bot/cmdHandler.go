@@ -16,6 +16,15 @@ type CommandHandler struct {
 }
 
 func (c *CommandHandler) PassServerMessage(message domain.ServerMessage, senderIsBanned bool) error {
+	if message, ok := message.(*domain.UserEvent); ok {
+		for _, cmd := range c.commands.All() {
+			var chatInterceptor command.Interceptor = c.loadedCommands[cmd.Name()]
+			err := c.commandCallback(chatInterceptor.OnUserEvent(message))
+			if err != nil {
+				return err
+			}
+		}
+	}
 	var sender = message.(FromUser).Sender()
 	switch message := message.(type) {
 	case *domain.ChatMessage:
