@@ -24,6 +24,7 @@ func (c *CommandHandler) PassServerMessage(message domain.ServerMessage, senderI
 				return err
 			}
 		}
+		return nil
 	}
 	var sender = message.(FromUser).Sender()
 	switch message := message.(type) {
