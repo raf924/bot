@@ -54,7 +54,7 @@ func (c *CommandHandler) PassServerMessage(message domain.ServerMessage, senderI
 			return nil
 		}
 		var executable = c.loadedCommands[cmd.Name()]
-		if !message.Sender().Is(c.botUser) && executable.IgnoreSelf() {
+		if executable.IgnoreSelf() && message.Sender().Is(c.botUser) {
 			return nil
 		}
 		err := c.commandCallback(executable.Execute(message))
