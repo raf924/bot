@@ -77,8 +77,8 @@ func (c *Connector) getCommandOr(mP *domain.ChatMessage) domain.ServerMessage {
 	return domain.NewCommandMessage(cmd.Name(), args[1:], argString, mP.Sender(), mP.Private(), mP.Timestamp())
 }
 
-func (c *Connector) Start() error {
-	c.context, c.cancelFunc = context.WithCancel(context.Background())
+func (c *Connector) Start(ctx context.Context) error {
+	c.context, c.cancelFunc = context.WithCancel(ctx)
 	c.connectionRelay.OnUserJoin(func(user *domain.User, timestamp time.Time) {
 		err := c.relayServer.Send(domain.NewUserEvent(user, domain.UserJoined, timestamp))
 		if err != nil {
@@ -102,12 +102,12 @@ func (c *Connector) Start() error {
 	if u == nil {
 		return fmt.Errorf("couldn't find connector among users")
 	}
-	err = c.relayServer.Start(u, c.users, c.config.Trigger)
+	err = c.relayServer.Start(ctx, u, c.users, c.config.Trigger)
 	if err != nil {
 		return err
 	}
 	go func() {
-		for {
+		for c.Err() == nil {
 			mP, err := c.receiveFromConnection()
 			if err != nil {
 				c.cancelFunc()
@@ -126,7 +126,7 @@ func (c *Connector) Start() error {
 		}
 	}()
 	go func() {
-		for {
+		for c.Err() == nil {
 			packet, err := c.receiveFromRelayServer()
 			if err != nil {
 				log.Println(err)

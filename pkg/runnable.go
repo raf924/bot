@@ -1,7 +1,9 @@
 package pkg
 
+import "context"
+
 type Runnable interface {
-	Start() error
+	Start(ctx context.Context) error
 	Done() <-chan struct{}
 	Err() error
 }

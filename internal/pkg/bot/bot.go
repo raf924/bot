@@ -42,6 +42,31 @@ type Bot struct {
 	trigger                  string
 }
 
+func NewBot(
+	config bot.Config,
+	userPermissionManager permissions.PermissionManager,
+	commandPermissionManager permissions.PermissionManager,
+	relay client.RelayClient,
+	commands ...command.Command,
+) *Bot {
+	banStorage, err := storage.NewFileStorage(config.ApiKeys["banStorageLocation"])
+	if err != nil {
+		log.Println(err)
+		banStorage = storage.NewNoOpStorage()
+	}
+	return &Bot{
+		users:                    domain.NewUserList(),
+		bans:                     make(map[string]ban),
+		loadedCommands:           make(map[string]command.Command),
+		commands:                 commands,
+		config:                   config,
+		commandPermissionManager: commandPermissionManager,
+		userPermissionManager:    userPermissionManager,
+		connectorRelay:           relay,
+		banStorage:               banStorage,
+	}
+}
+
 func (b *Bot) Trigger() string {
 	return b.trigger
 }
@@ -69,37 +94,88 @@ func (b *Bot) Err() error {
 	return b.err
 }
 
-func NewBot(
-	config bot.Config,
-	userPermissionManager permissions.PermissionManager,
-	commandPermissionManager permissions.PermissionManager,
-	relay client.RelayClient,
-	commands ...command.Command,
-) *Bot {
-	banStorage, err := storage.NewFileStorage(config.ApiKeys["banStorageLocation"])
-	if err != nil {
-		log.Println(err)
-		banStorage = storage.NewNoOpStorage()
-	}
-	return &Bot{
-		users:                    domain.NewUserList(),
-		bans:                     make(map[string]ban),
-		loadedCommands:           make(map[string]command.Command),
-		commands:                 commands,
-		config:                   config,
-		commandPermissionManager: commandPermissionManager,
-		userPermissionManager:    userPermissionManager,
-		connectorRelay:           relay,
-		banStorage:               banStorage,
-	}
-}
-
 func (b *Bot) BotUser() *domain.User {
 	return b.botUser
 }
 
 func (b *Bot) ApiKeys() map[string]string {
 	return b.config.ApiKeys
+}
+
+func (b *Bot) Start(ctx context.Context) error {
+	b.ctx, b.cancelFunc = context.WithCancel(ctx)
+	go func() {
+		select {
+		case <-b.connectorRelay.Done():
+			b.err = b.connectorRelay.Err()
+		case b.err = <-b.errorChan:
+		}
+		b.cancelFunc()
+	}()
+	b.loadBans()
+	b.initCommands()
+	var err error
+	confirmation, err := b.connectorRelay.Connect(domain.NewRegistrationMessage(b.getCommandList()))
+	if err != nil {
+		return fmt.Errorf("cannot connect to server: %v", err)
+	}
+	b.botUser = confirmation.CurrentUser()
+	b.users = confirmation.Users()
+	b.trigger = confirmation.Trigger()
+	commandHandler := CommandHandler{
+		commands:       domain.ImmutableCommandList(domain.NewCommandList(b.getCommandList()...)),
+		loadedCommands: b.loadedCommands,
+		botUser:        b.botUser,
+		commandCallback: func(messages []*domain.ClientMessage, err error) error {
+			if b.err != nil {
+				return fmt.Errorf("bot is down: %v", b.err)
+			}
+			if err != nil {
+				log.Println("error running command", err)
+				return nil
+			}
+			for _, message := range messages {
+				go func(message *domain.ClientMessage) {
+					err := b.connectorRelay.Send(message)
+					if err != nil {
+						b.errorChan <- err
+					}
+				}(message)
+			}
+			return nil
+		},
+		userPermissionManager:    b.userPermissionManager,
+		commandPermissionManager: b.commandPermissionManager,
+	}
+	go func() {
+		for b.err == nil && b.ctx.Err() == nil {
+			packet, err := b.connectorRelay.Recv()
+			if err != nil {
+				b.errorChan <- err
+				return
+			}
+			switch packet := packet.(type) {
+			case *domain.UserEvent:
+				switch packet.EventType() {
+				case domain.UserJoined:
+					b.users.Add(packet.User())
+				case domain.UserLeft:
+					b.users.Remove(packet.User())
+				}
+			}
+			go func() {
+				senderIsBanned := false
+				if packet, ok := packet.(FromUser); ok {
+					senderIsBanned = b.isBanned(packet.Sender())
+				}
+				if err = commandHandler.PassServerMessage(packet, senderIsBanned); err != nil {
+					b.errorChan <- err
+					return
+				}
+			}()
+		}
+	}()
+	return nil
 }
 
 func (b *Bot) AddCommand(command command.Command) {
@@ -156,78 +232,6 @@ func (b *Bot) initCommands() {
 		}
 		b.AddCommand(cmd)
 	}
-}
-
-func (b *Bot) Start() error {
-	b.ctx, b.cancelFunc = context.WithCancel(context.Background())
-	go func() {
-		b.err = <-b.errorChan
-		b.cancelFunc()
-	}()
-	b.loadBans()
-	b.initCommands()
-	var err error
-	confirmation, err := b.connectorRelay.Connect(domain.NewRegistrationMessage(b.getCommandList()))
-	if err != nil {
-		return fmt.Errorf("cannot connect to server: %v", err)
-	}
-	b.botUser = confirmation.CurrentUser()
-	b.users = confirmation.Users()
-	b.trigger = confirmation.Trigger()
-	commandHandler := CommandHandler{
-		commands:       domain.ImmutableCommandList(domain.NewCommandList(b.getCommandList()...)),
-		loadedCommands: b.loadedCommands,
-		botUser:        b.botUser,
-		commandCallback: func(messages []*domain.ClientMessage, err error) error {
-			if b.err != nil {
-				return fmt.Errorf("bot is down: %v", b.err)
-			}
-			if err != nil {
-				log.Println("error running command", err)
-				return nil
-			}
-			for _, message := range messages {
-				go func(message *domain.ClientMessage) {
-					err := b.connectorRelay.Send(message)
-					if err != nil {
-						b.errorChan <- err
-					}
-				}(message)
-			}
-			return nil
-		},
-		userPermissionManager:    b.userPermissionManager,
-		commandPermissionManager: b.commandPermissionManager,
-	}
-	go func() {
-		for {
-			packet, err := b.connectorRelay.Recv()
-			if err != nil {
-				b.errorChan <- err
-				return
-			}
-			switch packet := packet.(type) {
-			case *domain.UserEvent:
-				switch packet.EventType() {
-				case domain.UserJoined:
-					b.users.Add(packet.User())
-				case domain.UserLeft:
-					b.users.Remove(packet.User())
-				}
-			}
-			go func() {
-				senderIsBanned := false
-				if packet, ok := packet.(FromUser); ok {
-					senderIsBanned = b.isBanned(packet.Sender())
-				}
-				if err = commandHandler.PassServerMessage(packet, senderIsBanned); err != nil {
-					b.errorChan <- err
-					return
-				}
-			}()
-		}
-	}()
-	return nil
 }
 
 type FromUser interface {

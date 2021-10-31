@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"github.com/raf924/bot/pkg/config/connector"
 	"github.com/raf924/bot/pkg/domain"
 )
@@ -25,7 +26,7 @@ func GetRelayServer(config connector.Config) RelayServer {
 }
 
 type RelayServer interface {
-	Start(botUser *domain.User, onlineUsers domain.UserList, trigger string) error
+	Start(ctx context.Context, botUser *domain.User, onlineUsers domain.UserList, trigger string) error
 	Commands() domain.CommandList
 	Send(message domain.ServerMessage) error
 	Recv() (*domain.ClientMessage, error)
