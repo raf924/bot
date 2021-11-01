@@ -11,6 +11,7 @@ type CommandList interface {
 	Get(i int) *Command
 	Find(command string) *Command
 	Add(command *Command)
+	Append(list CommandList)
 }
 
 var _ CommandList = (*immutableCommandList)(nil)
@@ -21,7 +22,11 @@ type immutableCommandList struct {
 	CommandList
 }
 
-func (i *immutableCommandList) Add(command *Command) {
+func (i *immutableCommandList) Add(*Command) {
+	panic("cannot modify list")
+}
+
+func (i *immutableCommandList) Append(CommandList) {
 	panic("cannot modify list")
 }
 
@@ -33,6 +38,12 @@ type commandList struct {
 	rwm            *sync.RWMutex
 	commands       []*Command
 	commandIndexes map[string]int
+}
+
+func (l *commandList) Append(list CommandList) {
+	for _, command := range list.All() {
+		l.Add(command)
+	}
 }
 
 func (l *commandList) Copy() CommandList {
