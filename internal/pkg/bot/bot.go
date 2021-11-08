@@ -9,7 +9,7 @@ import (
 	"github.com/raf924/bot/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/config/bot"
 	"github.com/raf924/bot/pkg/domain"
-	"github.com/raf924/bot/pkg/relay/client"
+	"github.com/raf924/bot/pkg/rpc"
 	"github.com/raf924/bot/pkg/storage"
 	"log"
 	"time"
@@ -25,7 +25,7 @@ type ban struct {
 }
 
 type Bot struct {
-	connectorRelay           client.RelayClient
+	connectorRelay           rpc.DispatcherRelay
 	users                    domain.UserList
 	loadedCommands           map[string]command.Command
 	commands                 []command.Command
@@ -46,7 +46,7 @@ func NewBot(
 	config bot.Config,
 	userPermissionManager permissions.PermissionManager,
 	commandPermissionManager permissions.PermissionManager,
-	relay client.RelayClient,
+	relay rpc.DispatcherRelay,
 	commands ...command.Command,
 ) *Bot {
 	banStorage, err := storage.NewFileStorage(config.ApiKeys["banStorageLocation"])

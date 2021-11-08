@@ -1,4 +1,4 @@
-package connection
+package rpc
 
 import (
 	"github.com/raf924/bot/pkg/config/connector"
@@ -6,17 +6,19 @@ import (
 	"time"
 )
 
-var connectionRelays = map[string]RelayBuilder{}
+var connectionRelayBuilders = map[string]ConnectionRelayBuilder{}
 
-type RelayBuilder func(config interface{}) Relay
+type ConnectionRelayBuilder func(config interface{}) ConnectionRelay
 
-func RegisterConnectionRelay(key string, relayBuilder RelayBuilder) {
-	connectionRelays[key] = relayBuilder
+func RegisterConnectionRelay(key string, relayBuilder ConnectionRelayBuilder) {
+	connectionRelayBuilders[key] = relayBuilder
 }
 
-func GetConnectionRelay(config connector.Config) Relay {
+var _ = RegisterConnectionRelay
+
+func GetConnectionRelay(config connector.Config) ConnectionRelay {
 	for key, config := range config.Connection {
-		if builder, ok := connectionRelays[key]; ok {
+		if builder, ok := connectionRelayBuilders[key]; ok {
 			return builder(config)
 		}
 	}
@@ -48,7 +50,7 @@ type InviteMessage struct {
 	Recipient string
 }
 
-type Relay interface {
+type ConnectionRelay interface {
 	Recv() (*domain.ChatMessage, error)
 	Send(message *domain.ClientMessage) error
 	OnUserJoin(func(user *domain.User, timestamp time.Time))

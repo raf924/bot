@@ -3,15 +3,16 @@ package connector
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/raf924/bot/pkg"
 	"github.com/raf924/bot/pkg/command"
 	"github.com/raf924/bot/pkg/config/connector"
 	"github.com/raf924/bot/pkg/domain"
-	"github.com/raf924/bot/pkg/relay/connection"
-	"github.com/raf924/bot/pkg/relay/server"
+	"github.com/raf924/bot/pkg/rpc"
 	"log"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,8 +20,9 @@ var helpCommand = domain.NewCommand("help", []string{"h"}, "help")
 
 type Connector struct {
 	config          connector.Config
-	connectionRelay connection.Relay
-	relayServer     server.RelayServer
+	dispatchers     sync.Map
+	connectionRelay rpc.ConnectionRelay
+	relayServer     rpc.ConnectorRelay
 	context         context.Context
 	cancelFunc      context.CancelFunc
 	users           domain.UserList
@@ -34,10 +36,6 @@ func (c *Connector) Done() <-chan struct{} {
 
 func (c *Connector) Err() error {
 	return c.context.Err()
-}
-
-func (c *Connector) Value(key interface{}) interface{} {
-	return c.context.Value(key)
 }
 
 func (c *Connector) getCommandOr(mP *domain.ChatMessage) domain.ServerMessage {
@@ -54,9 +52,14 @@ func (c *Connector) getCommandOr(mP *domain.ChatMessage) domain.ServerMessage {
 		return mP
 	}
 	possibleCommand := args[0]
+	commands := domain.NewCommandList()
+	c.dispatchers.Range(func(key, value interface{}) bool {
+		commands.Append(value.(rpc.Dispatcher).Commands())
+		return true
+	})
 	if command.Is(possibleCommand, helpCommand) {
 		var names []string
-		for _, cmd := range c.relayServer.Commands().All() {
+		for _, cmd := range commands.All() {
 			names = append(names, fmt.Sprintf("%s%s", c.config.Trigger, cmd.Name()))
 			for _, alias := range append(cmd.Aliases()) {
 				names = append(names, fmt.Sprintf("%s%s (%s)", c.config.Trigger, alias, cmd.Name()))
@@ -65,11 +68,12 @@ func (c *Connector) getCommandOr(mP *domain.ChatMessage) domain.ServerMessage {
 		sort.Strings(names)
 		err := c.sendToConnection(domain.NewClientMessage(strings.Join(names, ", "), mP.Sender(), mP.Private()))
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			c.cancelFunc()
 		}
 		return nil
 	}
-	cmd := c.relayServer.Commands().Find(possibleCommand)
+	cmd := commands.Find(possibleCommand)
 	if cmd == nil {
 		return mP
 	}
@@ -80,13 +84,13 @@ func (c *Connector) getCommandOr(mP *domain.ChatMessage) domain.ServerMessage {
 func (c *Connector) Start(ctx context.Context) error {
 	c.context, c.cancelFunc = context.WithCancel(ctx)
 	c.connectionRelay.OnUserJoin(func(user *domain.User, timestamp time.Time) {
-		err := c.relayServer.Send(domain.NewUserEvent(user, domain.UserJoined, timestamp))
+		err := c.sendToDispatchers(domain.NewUserEvent(user, domain.UserJoined, timestamp))
 		if err != nil {
 			log.Println(err)
 		}
 	})
 	c.connectionRelay.OnUserLeft(func(user *domain.User, timestamp time.Time) {
-		err := c.relayServer.Send(domain.NewUserEvent(user, domain.UserLeft, timestamp))
+		err := c.sendToDispatchers(domain.NewUserEvent(user, domain.UserLeft, timestamp))
 		if err != nil {
 			log.Println(err)
 		}
@@ -108,6 +112,34 @@ func (c *Connector) Start(ctx context.Context) error {
 	}
 	go func() {
 		for c.Err() == nil {
+			c.dispatchers.Range(func(key, value interface{}) bool {
+				select {
+				case <-value.(rpc.Dispatcher).Done():
+					c.dispatchers.Delete(key)
+					return false
+				default:
+				}
+				return true
+			})
+		}
+	}()
+	go func() {
+		for c.Err() == nil {
+			dispatcher, err := c.relayServer.Accept()
+			if err != nil {
+				c.cancelFunc()
+				return
+			}
+			newUUID, err := uuid.NewUUID()
+			if err != nil {
+				c.cancelFunc()
+				return
+			}
+			c.dispatchers.Store(newUUID.String(), dispatcher)
+		}
+	}()
+	go func() {
+		for c.Err() == nil {
 			mP, err := c.receiveFromConnection()
 			if err != nil {
 				c.cancelFunc()
@@ -117,12 +149,10 @@ func (c *Connector) Start(ctx context.Context) error {
 			if m == nil {
 				continue
 			}
-			go func() {
-				err := c.relayServer.Send(m)
-				if err != nil {
-					log.Println(err)
-				}
-			}()
+			err = c.sendToDispatchers(m)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}()
 	go func() {
@@ -150,15 +180,24 @@ func (c *Connector) receiveFromConnection() (*domain.ChatMessage, error) {
 	return c.connectionRelay.Recv()
 }
 
-func (c *Connector) sendToServer(m domain.ServerMessage) error {
-	return c.relayServer.Send(m)
+func (c *Connector) sendToDispatchers(m domain.ServerMessage) error {
+	c.dispatchers.Range(func(key, value interface{}) bool {
+		go func() {
+			err := value.(rpc.Dispatcher).Dispatch(m)
+			if err != nil {
+				log.Println(err)
+			}
+		}()
+		return true
+	})
+	return nil
 }
 
 func (c *Connector) sendToConnection(m *domain.ClientMessage) error {
 	return c.connectionRelay.Send(m)
 }
 
-func NewConnector(config connector.Config, connection connection.Relay, bot server.RelayServer) *Connector {
+func NewConnector(config connector.Config, connection rpc.ConnectionRelay, bot rpc.ConnectorRelay) *Connector {
 	return &Connector{
 		config:          config,
 		connectionRelay: connection,

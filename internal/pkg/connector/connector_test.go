@@ -3,13 +3,12 @@ package connector
 import (
 	"github.com/raf924/bot/pkg/config/connector"
 	"github.com/raf924/bot/pkg/domain"
-	"github.com/raf924/bot/pkg/relay/connection"
-	"github.com/raf924/bot/pkg/relay/server"
+	"github.com/raf924/bot/pkg/rpc"
 	"testing"
 	"time"
 )
 
-var _ server.RelayServer = (*dummyServer)(nil)
+var _ rpc.ConnectorRelay = (*dummyServer)(nil)
 
 type dummyServer struct {
 }
@@ -33,7 +32,7 @@ func (d *dummyServer) Commands() domain.CommandList {
 	)
 }
 
-var _ connection.Relay = (*dummyConnection)(nil)
+var _ rpc.ConnectionRelay = (*dummyConnection)(nil)
 
 type dummyConnection struct {
 	users domain.UserList
@@ -71,7 +70,7 @@ func TestConnector(t *testing.T) {
 	}
 	sentPacket := domain.NewChatMessage("Hello", domain.NewUser("test", "id", domain.RegularUser), nil, false, false, time.Now(), true)
 	go func() {
-		err = cr.sendToServer(sentPacket)
+		err = cr.sendToDispatchers(sentPacket)
 		if err != nil {
 			t.Errorf("unexpected error = %v", err)
 		}
@@ -85,7 +84,7 @@ func TestConnector(t *testing.T) {
 
 		packetFromBot := domain.NewClientMessage(sentPacket.Message(), sentPacket.Sender(), sentPacket.Private())
 		_ = packetFromBot
-		var cm connection.ChatMessage
+		var cm rpc.ChatMessage
 		if cm.Message != sentPacket.Message() {
 			t.Errorf("expected message %v got %v", sentPacket.Message(), cm.Message)
 		}

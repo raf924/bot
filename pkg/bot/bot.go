@@ -6,7 +6,7 @@ import (
 	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
 	botConfig "github.com/raf924/bot/pkg/config/bot"
-	"github.com/raf924/bot/pkg/relay/client"
+	"github.com/raf924/bot/pkg/rpc"
 	"log"
 	"reflect"
 )
@@ -44,7 +44,7 @@ func NewBot(config botConfig.Config) pkg.Runnable {
 		config,
 		userPermissionManager,
 		commandPermissionManager,
-		client.GetRelayClient(config),
+		rpc.GetDispatcherRelay(config),
 		bot.Commands...,
 	)
 }
