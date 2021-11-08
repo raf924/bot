@@ -2,7 +2,7 @@ package queue
 
 import (
 	"fmt"
-	"github.com/google/uuid"
+	"github.com/segmentio/ksuid"
 	"sync"
 )
 
@@ -95,13 +95,13 @@ func (q *queue) cancel(id string) {
 
 func (q *queue) NewProducer() (*Producer, error) {
 	return &Producer{
-		id: uuid.NewString(),
+		id: ksuid.New().String(),
 		q:  q,
 	}, nil
 }
 
 func (q *queue) NewConsumer() (*Consumer, error) {
-	id := uuid.NewString()
+	id := ksuid.New().String()
 	rwm := &sync.RWMutex{}
 	q.wLocker.Lock()
 	q.consumerBuffers[id] = &linkedBuffer{

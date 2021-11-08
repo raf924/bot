@@ -3,12 +3,12 @@ package connector
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/raf924/bot/pkg"
 	"github.com/raf924/bot/pkg/command"
 	"github.com/raf924/bot/pkg/config/connector"
 	"github.com/raf924/bot/pkg/domain"
 	"github.com/raf924/bot/pkg/rpc"
+	"github.com/segmentio/ksuid"
 	"log"
 	"sort"
 	"strings"
@@ -130,7 +130,7 @@ func (c *Connector) Start(ctx context.Context) error {
 				c.cancelFunc()
 				return
 			}
-			newUUID, err := uuid.NewUUID()
+			newUUID, err := ksuid.NewRandom()
 			if err != nil {
 				c.cancelFunc()
 				return
