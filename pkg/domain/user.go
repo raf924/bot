@@ -39,8 +39,8 @@ func NewUser(nick string, id string, role UserRole) *User {
 	return &User{nick: nick, id: id, role: role}
 }
 
-func NewOnlineUser(nick string, id string, role UserRole, joinedAt *time.Time) *User {
-	return &User{nick: nick, id: id, role: role, joinedAt: joinedAt}
+func NewOnlineUser(nick string, id string, role UserRole, joinedAt time.Time) *User {
+	return &User{nick: nick, id: id, role: role, joinedAt: &joinedAt}
 }
 
 func (u *User) Nick() string {

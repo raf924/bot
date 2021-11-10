@@ -7,10 +7,10 @@ import (
 )
 
 type Queue interface {
-	producer
+	produceable
 	consumable
-	NewProducer() (*Producer, error)
-	NewConsumer() (*Consumer, error)
+	NewProducer() (Producer, error)
+	NewConsumer() (Consumer, error)
 }
 
 type linkedBuffer struct {
@@ -93,14 +93,14 @@ func (q *queue) cancel(id string) {
 	q.wLocker.Unlock()
 }
 
-func (q *queue) NewProducer() (*Producer, error) {
-	return &Producer{
+func (q *queue) NewProducer() (Producer, error) {
+	return &producer{
 		id: ksuid.New().String(),
 		q:  q,
 	}, nil
 }
 
-func (q *queue) NewConsumer() (*Consumer, error) {
+func (q *queue) NewConsumer() (Consumer, error) {
 	id := ksuid.New().String()
 	rwm := &sync.RWMutex{}
 	q.wLocker.Lock()
@@ -110,7 +110,7 @@ func (q *queue) NewConsumer() (*Consumer, error) {
 		c:    sync.NewCond(rwm),
 	}
 	q.wLocker.Unlock()
-	return &Consumer{
+	return &consumer{
 		id: id,
 		q:  q,
 	}, nil

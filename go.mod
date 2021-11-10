@@ -1,6 +1,6 @@
 module github.com/raf924/bot
 
-go 1.16
+go 1.17
 
 require (
 	github.com/segmentio/ksuid v1.0.4

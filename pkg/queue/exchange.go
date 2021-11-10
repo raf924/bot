@@ -1,11 +1,16 @@
 package queue
 
-type Exchange struct {
-	*Producer
-	*Consumer
+type Exchange interface {
+	Producer
+	Consumer
 }
 
-func NewExchange(producerQueue, consumerQueue Queue) (*Exchange, error) {
+type exchange struct {
+	Producer
+	Consumer
+}
+
+func NewExchange(producerQueue, consumerQueue Queue) (Exchange, error) {
 	producer, err := producerQueue.NewProducer()
 	if err != nil {
 		return nil, err
@@ -14,7 +19,7 @@ func NewExchange(producerQueue, consumerQueue Queue) (*Exchange, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Exchange{
+	return &exchange{
 		Producer: producer,
 		Consumer: consumer,
 	}, nil
