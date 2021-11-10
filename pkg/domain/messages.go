@@ -10,12 +10,12 @@ type ServerMessage interface {
 }
 
 type ChatMessage struct {
+	recipients            []*User
+	timestamp             time.Time
 	message               string
 	sender                *User
 	mentionsConnectorUser bool
-	recipients            []*User
 	private               bool
-	timestamp             time.Time
 	incoming              bool
 }
 
