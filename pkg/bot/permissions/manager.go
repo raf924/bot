@@ -33,3 +33,18 @@ func GetManager(config botConfig.PermissionConfig) PermissionManager {
 	}
 	return builder(config.Location)
 }
+
+type noCheckPermissionManager struct {
+}
+
+func (n *noCheckPermissionManager) GetPermission(string) (Permission, error) {
+	return ADMIN, nil
+}
+
+func (n *noCheckPermissionManager) SetPermission(string, Permission) error {
+	return nil
+}
+
+func NewNoCheckPermissionManager() PermissionManager {
+	return &noCheckPermissionManager{}
+}

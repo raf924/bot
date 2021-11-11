@@ -1,6 +1,8 @@
 package rpc
 
-import "github.com/raf924/bot/pkg/domain"
+import (
+	"github.com/raf924/bot/pkg/domain"
+)
 
 type Dispatcher interface {
 	Dispatch(message domain.ServerMessage) error

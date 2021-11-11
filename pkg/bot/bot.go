@@ -11,17 +11,6 @@ import (
 	"reflect"
 )
 
-type noCheckPermissionManager struct {
-}
-
-func (n *noCheckPermissionManager) GetPermission(id string) (permissions.Permission, error) {
-	return permissions.ADMIN, nil
-}
-
-func (n *noCheckPermissionManager) SetPermission(id string, permission permissions.Permission) error {
-	return nil
-}
-
 func HandleCommand(command command.Command) {
 	log.Println("Handling", command.Name())
 	if reflect.TypeOf(command).Kind() != reflect.Ptr {
@@ -30,12 +19,14 @@ func HandleCommand(command command.Command) {
 	bot.Commands = append(bot.Commands, command)
 }
 
+var _ = HandleCommand
+
 func NewBot(config botConfig.Config) pkg.Runnable {
 	var userPermissionManager permissions.PermissionManager
 	var commandPermissionManager permissions.PermissionManager
 	if config.Users.AllowAll {
-		userPermissionManager = &noCheckPermissionManager{}
-		commandPermissionManager = &noCheckPermissionManager{}
+		userPermissionManager = permissions.NewNoCheckPermissionManager()
+		commandPermissionManager = permissions.NewNoCheckPermissionManager()
 	} else {
 		userPermissionManager = permissions.GetManager(config.Users.Permissions)
 		commandPermissionManager = permissions.GetManager(config.Commands.Permissions)
@@ -48,3 +39,5 @@ func NewBot(config botConfig.Config) pkg.Runnable {
 		bot.Commands...,
 	)
 }
+
+var _ = NewBot

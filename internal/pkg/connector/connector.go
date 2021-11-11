@@ -197,10 +197,10 @@ func (c *Connector) sendToConnection(m *domain.ClientMessage) error {
 	return c.connectionRelay.Send(m)
 }
 
-func NewConnector(config connector.Config, connection rpc.ConnectionRelay, bot rpc.ConnectorRelay) *Connector {
+func NewConnector(config connector.Config, connection rpc.ConnectionRelay, connectorRelay rpc.ConnectorRelay) *Connector {
 	return &Connector{
 		config:          config,
 		connectionRelay: connection,
-		relayServer:     bot,
+		relayServer:     connectorRelay,
 	}
 }

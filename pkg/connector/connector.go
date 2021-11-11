@@ -9,6 +9,8 @@ import (
 
 func NewConnector(config cnf.Config) pkg.Runnable {
 	connection := connectionRelay.GetConnectionRelay(config)
-	bot := connectionRelay.GetConnectorRelay(config)
-	return connector.NewConnector(config, connection, bot)
+	connectorRelay := connectionRelay.GetConnectorRelay(config)
+	return connector.NewConnector(config, connection, connectorRelay)
 }
+
+var _ = NewConnector

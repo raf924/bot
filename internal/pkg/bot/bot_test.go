@@ -1,10 +1,13 @@
 package bot
 
 import (
+	"context"
+	"github.com/raf924/bot/internal/pkg/rpc"
 	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/config/bot"
 	"github.com/raf924/bot/pkg/domain"
+	"github.com/raf924/bot/pkg/queue"
 	"testing"
 	"time"
 )
@@ -12,40 +15,6 @@ import (
 var botUser = domain.NewUser("bot", "id", domain.RegularUser)
 
 var user = domain.NewUser("user", "userId", domain.RegularUser)
-
-type dummyRelay struct {
-}
-
-func (d *dummyRelay) Send(packet *domain.ClientMessage) error {
-	panic("implement me")
-}
-
-func (d *dummyRelay) Recv() (domain.ServerMessage, error) {
-	panic("implement me")
-}
-
-func (d *dummyRelay) GetUsers() []*domain.User {
-	return []*domain.User{botUser, user}
-}
-
-func (d *dummyRelay) Connect(registration *domain.RegistrationMessage) (*domain.User, error) {
-	return botUser, nil
-}
-
-func (d *dummyRelay) Done() <-chan struct{} {
-	return make(chan struct{})
-}
-
-type dummyPermissionManager struct {
-}
-
-func (d *dummyPermissionManager) GetPermission(id string) (permissions.Permission, error) {
-	return permissions.ADMIN, nil
-}
-
-func (d *dummyPermissionManager) SetPermission(id string, permission permissions.Permission) error {
-	return nil
-}
 
 type testCommand struct {
 	init        func(executor command.Executor) error
@@ -89,12 +58,12 @@ var messageReply = domain.NewClientMessage("message", user, false)
 
 var userEventReply = domain.NewClientMessage("userEvent", user, false)
 
-func testReply(t testing.TB, p domain.ServerMessage, expectedReply *domain.ClientMessage) {
-	err := WithBotExchange.Produce(p)
+func testReply(t testing.TB, input domain.ServerMessage, inputProducer queue.Producer, outputConsumer queue.Consumer, expectedReply *domain.ClientMessage) {
+	err := inputProducer.Produce(input)
 	if err != nil {
 		t.Fatalf("unexpected error = %v", err)
 	}
-	bp, err := WithBotExchange.Consume()
+	bp, err := outputConsumer.Consume()
 	if err != nil {
 		t.Fatalf("unexpected error = %v", err)
 	}
@@ -112,46 +81,72 @@ func testReply(t testing.TB, p domain.ServerMessage, expectedReply *domain.Clien
 }
 
 func TestBot(t *testing.T) {
-	b := NewBot(bot.Config{
-		Connector: nil,
-		Trigger:   "!",
-		ApiKeys:   map[string]string{},
-		Users: bot.UserConfig{
-			AllowAll: true,
-		},
-		Commands: bot.CommandConfig{
-			Disabled: map[string]bool{
-				"ban":    true,
-				"verify": true,
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	clientMessageQueue := queue.NewQueue()
+	serverMessageQueue := queue.NewQueue()
+	clientMessageConsumer, err := clientMessageQueue.NewConsumer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientMessageProducer, err := clientMessageQueue.NewProducer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverMessageConsumer, err := serverMessageQueue.NewConsumer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverMessageProducer, err := serverMessageQueue.NewProducer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := NewBot(
+		bot.Config{
+			Connector: nil,
+			Trigger:   "!",
+			ApiKeys:   map[string]string{},
+			Users: bot.UserConfig{
+				AllowAll: true,
 			},
-			Permissions: bot.PermissionConfig{},
+			Commands: bot.CommandConfig{
+				Disabled: map[string]bool{
+					"ban":    true,
+					"verify": true,
+				},
+				Permissions: bot.PermissionConfig{},
+			},
 		},
-	}, &dummyPermissionManager{}, &dummyPermissionManager{}, &dummyRelay{}, &testCommand{
-		init: func(executor command.Executor) error {
-			return nil
+		permissions.NewNoCheckPermissionManager(),
+		permissions.NewNoCheckPermissionManager(),
+		rpc.NewDefaultDispatcherRelay(ctx, domain.NewUserList(), "!", botUser, clientMessageProducer, serverMessageConsumer),
+		&testCommand{
+			init: func(executor command.Executor) error {
+				return nil
+			},
+			execute: func(packet *domain.CommandMessage) ([]*domain.ClientMessage, error) {
+				return []*domain.ClientMessage{
+					commandReply,
+				}, nil
+			},
+			onChat: func(packet *domain.ChatMessage) ([]*domain.ClientMessage, error) {
+				return []*domain.ClientMessage{
+					messageReply,
+				}, nil
+			},
+			onUserEvent: func(packet *domain.UserEvent) ([]*domain.ClientMessage, error) {
+				return []*domain.ClientMessage{
+					userEventReply,
+				}, nil
+			},
+			ignoreSelf: false,
 		},
-		execute: func(packet *domain.CommandMessage) ([]*domain.ClientMessage, error) {
-			return []*domain.ClientMessage{
-				commandReply,
-			}, nil
-		},
-		onChat: func(packet *domain.ChatMessage) ([]*domain.ClientMessage, error) {
-			return []*domain.ClientMessage{
-				messageReply,
-			}, nil
-		},
-		onUserEvent: func(packet *domain.UserEvent) ([]*domain.ClientMessage, error) {
-			return []*domain.ClientMessage{
-				userEventReply,
-			}, nil
-		},
-		ignoreSelf: true,
-	})
-	err := b.Start()
+	)
+	err = b.Start(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error = %v", err)
 	}
-	testReply(t, domain.NewChatMessage("test", user, nil, false, false, time.Now(), true), messageReply)
-	testReply(t, domain.NewCommandMessage("test", nil, "", user, false, time.Now()), commandReply)
-	testReply(t, domain.NewUserEvent(user, domain.UserJoined, time.Now()), userEventReply)
+	testReply(t, domain.NewChatMessage("test", user, nil, false, false, time.Now(), true), serverMessageProducer, clientMessageConsumer, messageReply)
+	testReply(t, domain.NewCommandMessage("test", nil, "", user, false, time.Now()), serverMessageProducer, clientMessageConsumer, commandReply)
+	testReply(t, domain.NewUserEvent(user, domain.UserJoined, time.Now()), serverMessageProducer, clientMessageConsumer, userEventReply)
 }
