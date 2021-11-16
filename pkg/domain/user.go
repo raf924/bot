@@ -28,6 +28,9 @@ func (u Users) Len() int {
 }
 
 func (u Users) Less(i, j int) bool {
+	if u[i].joinedAt == nil || u[j].joinedAt == nil {
+		return false
+	}
 	return u[i].joinedAt.Before(*u[j].joinedAt)
 }
 
