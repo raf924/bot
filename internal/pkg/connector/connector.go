@@ -185,6 +185,7 @@ func (c *Connector) sendToDispatchers(m domain.ServerMessage) error {
 		go func() {
 			err := value.(rpc.Dispatcher).Dispatch(m)
 			if err != nil {
+				c.dispatchers.Delete(key)
 				log.Println(err)
 			}
 		}()
