@@ -1,7 +1,7 @@
 package permissions
 
 import (
-	botConfig "github.com/raf924/bot/pkg/config/bot"
+	botConfig "github.com/raf924/bot/v2/pkg/config/bot"
 	"github.com/raf924/connector-sdk/domain"
 )
 

@@ -1,9 +1,9 @@
 package connector
 
 import (
-	"github.com/raf924/bot/internal/pkg/connector"
-	"github.com/raf924/bot/pkg"
-	cnf "github.com/raf924/bot/pkg/config/connector"
+	"github.com/raf924/bot/v2/internal/pkg/connector"
+	"github.com/raf924/bot/v2/pkg"
+	cnf "github.com/raf924/bot/v2/pkg/config/connector"
 	"github.com/raf924/connector-sdk/rpc"
 )
 

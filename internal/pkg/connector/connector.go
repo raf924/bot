@@ -3,9 +3,9 @@ package connector
 import (
 	"context"
 	"fmt"
-	"github.com/raf924/bot/pkg"
-	"github.com/raf924/bot/pkg/command"
-	"github.com/raf924/bot/pkg/config/connector"
+	"github.com/raf924/bot/v2/pkg"
+	"github.com/raf924/bot/v2/pkg/command"
+	"github.com/raf924/bot/v2/pkg/config/connector"
 	"github.com/raf924/connector-sdk/domain"
 	"github.com/raf924/connector-sdk/rpc"
 	"github.com/segmentio/ksuid"

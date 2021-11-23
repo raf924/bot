@@ -3,9 +3,9 @@ package connector
 import (
 	"context"
 	"fmt"
-	internalRpc "github.com/raf924/bot/internal/pkg/rpc"
-	"github.com/raf924/bot/pkg"
-	"github.com/raf924/bot/pkg/config/connector"
+	internalRpc "github.com/raf924/bot/v2/internal/pkg/rpc"
+	"github.com/raf924/bot/v2/pkg"
+	"github.com/raf924/bot/v2/pkg/config/connector"
 	"github.com/raf924/connector-sdk/domain"
 	"github.com/raf924/connector-sdk/queue"
 	"testing"

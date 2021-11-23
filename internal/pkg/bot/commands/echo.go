@@ -7,7 +7,6 @@ import (
 )
 
 type EchoCommand struct {
-	//command.NoOpCommand
 	command.NoOpInterceptor
 }
 

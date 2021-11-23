@@ -1,10 +1,10 @@
 package bot
 
 import (
-	"github.com/raf924/bot/internal/pkg/bot"
-	"github.com/raf924/bot/pkg"
-	"github.com/raf924/bot/pkg/bot/permissions"
-	botConfig "github.com/raf924/bot/pkg/config/bot"
+	"github.com/raf924/bot/v2/internal/pkg/bot"
+	"github.com/raf924/bot/v2/pkg"
+	"github.com/raf924/bot/v2/pkg/bot/permissions"
+	botConfig "github.com/raf924/bot/v2/pkg/config/bot"
 	"github.com/raf924/connector-sdk/rpc"
 )
 

@@ -1,4 +1,4 @@
-module github.com/raf924/bot
+module github.com/raf924/bot/v2
 
 go 1.17
 

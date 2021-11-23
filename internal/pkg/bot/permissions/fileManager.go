@@ -2,7 +2,7 @@ package permissions
 
 import (
 	"encoding/json"
-	"github.com/raf924/bot/pkg/bot/permissions"
+	"github.com/raf924/bot/v2/pkg/bot/permissions"
 	"github.com/raf924/connector-sdk/domain"
 	"gopkg.in/yaml.v2"
 	"os"

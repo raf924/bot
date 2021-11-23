@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"context"
-	"github.com/raf924/bot/pkg"
+	"github.com/raf924/bot/v2/pkg"
 	"github.com/raf924/connector-sdk/domain"
 	"github.com/raf924/connector-sdk/queue"
 	"github.com/raf924/connector-sdk/rpc"
