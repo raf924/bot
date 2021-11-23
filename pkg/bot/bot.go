@@ -3,23 +3,10 @@ package bot
 import (
 	"github.com/raf924/bot/internal/pkg/bot"
 	"github.com/raf924/bot/pkg"
-	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
 	botConfig "github.com/raf924/bot/pkg/config/bot"
-	"github.com/raf924/bot/pkg/rpc"
-	"log"
-	"reflect"
+	"github.com/raf924/connector-sdk/rpc"
 )
-
-func HandleCommand(command command.Command) {
-	log.Println("Handling", command.Name())
-	if reflect.TypeOf(command).Kind() != reflect.Ptr {
-		log.Println("command must be a pointer type")
-	}
-	bot.Commands = append(bot.Commands, command)
-}
-
-var _ = HandleCommand
 
 func NewBot(config botConfig.Config) pkg.Runnable {
 	var userPermissionManager permissions.PermissionManager
@@ -35,9 +22,19 @@ func NewBot(config botConfig.Config) pkg.Runnable {
 		config,
 		userPermissionManager,
 		commandPermissionManager,
-		rpc.GetDispatcherRelay(config),
+		GetDispatcherRelay(config),
 		bot.Commands...,
 	)
+}
+
+func GetDispatcherRelay(config botConfig.Config) rpc.DispatcherRelay {
+	for relayKey, relayConfig := range config.Connector {
+		relayBuilder := rpc.GetDispatcherRelay(relayKey)
+		if relayBuilder != nil {
+			return relayBuilder(relayConfig)
+		}
+	}
+	return nil
 }
 
 var _ = NewBot

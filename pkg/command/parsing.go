@@ -1,7 +1,7 @@
 package command
 
 import (
-	"github.com/raf924/bot/pkg/domain"
+	"github.com/raf924/connector-sdk/domain"
 	"sort"
 )
 
@@ -19,13 +19,4 @@ func Is(possibleCommand string, cmd *domain.Command) bool {
 		return true
 	}
 	return false
-}
-
-func Find(commands []*domain.Command, possibleCommand string) *domain.Command {
-	for _, cmd := range commands {
-		if Is(possibleCommand, cmd) {
-			return cmd
-		}
-	}
-	return nil
 }

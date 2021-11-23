@@ -3,6 +3,7 @@ package permissions
 import (
 	"encoding/json"
 	"github.com/raf924/bot/pkg/bot/permissions"
+	"github.com/raf924/connector-sdk/domain"
 	"gopkg.in/yaml.v2"
 	"os"
 )
@@ -21,20 +22,20 @@ type Encoder interface {
 }
 
 type filePermissionManager struct {
-	permissions map[string]permissions.Permission
+	permissions map[string]domain.Permission
 	encoder     Encoder
 	decoder     Decoder
 }
 
-func (f *filePermissionManager) GetPermission(id string) (permissions.Permission, error) {
+func (f *filePermissionManager) GetPermission(id string) (domain.Permission, error) {
 	p, ok := f.permissions[id]
 	if !ok {
-		return permissions.UNKNOWN, nil
+		return domain.IsUnknown, nil
 	}
 	return p, nil
 }
 
-func (f *filePermissionManager) SetPermission(id string, permission permissions.Permission) error {
+func (f *filePermissionManager) SetPermission(id string, permission domain.Permission) error {
 	f.permissions[id] = permission
 	return f.encoder.Encode(f.permissions)
 }
@@ -46,7 +47,7 @@ func newJsonFileManager(fileName string) permissions.PermissionManager {
 	}
 	encoder := json.NewEncoder(f)
 	decoder := json.NewDecoder(f)
-	var perms map[string]permissions.Permission
+	var perms map[string]domain.Permission
 	if err := decoder.Decode(&perms); err != nil {
 		return nil
 	}
@@ -64,7 +65,7 @@ func newYamlFileManager(fileName string) permissions.PermissionManager {
 	}
 	encoder := yaml.NewEncoder(f)
 	decoder := yaml.NewDecoder(f)
-	var perms map[string]permissions.Permission
+	var perms map[string]domain.Permission
 	if err := decoder.Decode(&perms); err != nil {
 		return nil
 	}

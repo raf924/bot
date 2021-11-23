@@ -2,16 +2,17 @@ package permissions
 
 import (
 	botConfig "github.com/raf924/bot/pkg/config/bot"
+	"github.com/raf924/connector-sdk/domain"
 )
 
 var permissionFormats = map[string]ManagerBuilder{}
 
 type PermissionReader interface {
-	GetPermission(id string) (Permission, error)
+	GetPermission(id string) (domain.Permission, error)
 }
 
 type PermissionWriter interface {
-	SetPermission(id string, permission Permission) error
+	SetPermission(id string, permission domain.Permission) error
 }
 
 type PermissionManager interface {
@@ -37,11 +38,11 @@ func GetManager(config botConfig.PermissionConfig) PermissionManager {
 type noCheckPermissionManager struct {
 }
 
-func (n *noCheckPermissionManager) GetPermission(string) (Permission, error) {
-	return ADMIN, nil
+func (n *noCheckPermissionManager) GetPermission(string) (domain.Permission, error) {
+	return domain.IsAdmin, nil
 }
 
-func (n *noCheckPermissionManager) SetPermission(string, Permission) error {
+func (n *noCheckPermissionManager) SetPermission(string, domain.Permission) error {
 	return nil
 }
 

@@ -2,9 +2,8 @@ package bot
 
 import (
 	"fmt"
-	"github.com/raf924/bot/pkg/bot/command"
-	"github.com/raf924/bot/pkg/bot/permissions"
-	"github.com/raf924/bot/pkg/domain"
+	"github.com/raf924/connector-sdk/command"
+	"github.com/raf924/connector-sdk/domain"
 	"strconv"
 	"strings"
 	"time"
@@ -38,7 +37,7 @@ func (b *Bot) verifyId(id string) bool {
 	if err != nil {
 		return false
 	}
-	return permission != permissions.UNKNOWN
+	return permission != domain.IsUnknown
 }
 
 func (b *Bot) verify(command *domain.CommandMessage) ([]*domain.ClientMessage, error) {

@@ -1,8 +1,8 @@
 package commands
 
 import (
-	"github.com/raf924/bot/pkg/bot/command"
-	"github.com/raf924/bot/pkg/domain"
+	"github.com/raf924/connector-sdk/command"
+	"github.com/raf924/connector-sdk/domain"
 	"strings"
 )
 
@@ -11,7 +11,7 @@ type EchoCommand struct {
 	command.NoOpInterceptor
 }
 
-func (e *EchoCommand) Init(bot command.Executor) error {
+func (e *EchoCommand) Init(command.Executor) error {
 	return nil
 }
 

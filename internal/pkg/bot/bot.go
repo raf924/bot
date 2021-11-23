@@ -5,12 +5,12 @@ import (
 	"fmt"
 	_ "github.com/raf924/bot/internal/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg"
-	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/config/bot"
-	"github.com/raf924/bot/pkg/domain"
-	"github.com/raf924/bot/pkg/rpc"
-	"github.com/raf924/bot/pkg/storage"
+	"github.com/raf924/connector-sdk/command"
+	"github.com/raf924/connector-sdk/domain"
+	"github.com/raf924/connector-sdk/rpc"
+	"github.com/raf924/connector-sdk/storage"
 	"log"
 	"time"
 )
@@ -71,7 +71,7 @@ func (b *Bot) Trigger() string {
 	return b.trigger
 }
 
-func (b *Bot) UserHasPermission(user *domain.User, permission permissions.Permission) bool {
+func (b *Bot) UserHasPermission(user *domain.User, permission domain.Permission) bool {
 	perm, err := b.userPermissionManager.GetPermission(user.Id())
 	if err != nil {
 		return false

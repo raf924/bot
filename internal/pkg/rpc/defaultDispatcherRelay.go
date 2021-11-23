@@ -2,9 +2,9 @@ package rpc
 
 import (
 	"context"
-	"github.com/raf924/bot/pkg/domain"
-	"github.com/raf924/bot/pkg/queue"
-	"github.com/raf924/bot/pkg/rpc"
+	"github.com/raf924/connector-sdk/domain"
+	"github.com/raf924/connector-sdk/queue"
+	"github.com/raf924/connector-sdk/rpc"
 )
 
 type defaultDispatcherRelay struct {

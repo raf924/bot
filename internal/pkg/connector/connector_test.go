@@ -6,8 +6,8 @@ import (
 	internalRpc "github.com/raf924/bot/internal/pkg/rpc"
 	"github.com/raf924/bot/pkg"
 	"github.com/raf924/bot/pkg/config/connector"
-	"github.com/raf924/bot/pkg/domain"
-	"github.com/raf924/bot/pkg/queue"
+	"github.com/raf924/connector-sdk/domain"
+	"github.com/raf924/connector-sdk/queue"
 	"testing"
 	"time"
 )

@@ -3,11 +3,11 @@ package bot
 import (
 	"context"
 	"github.com/raf924/bot/internal/pkg/rpc"
-	"github.com/raf924/bot/pkg/bot/command"
 	"github.com/raf924/bot/pkg/bot/permissions"
 	"github.com/raf924/bot/pkg/config/bot"
-	"github.com/raf924/bot/pkg/domain"
-	"github.com/raf924/bot/pkg/queue"
+	"github.com/raf924/connector-sdk/command"
+	"github.com/raf924/connector-sdk/domain"
+	"github.com/raf924/connector-sdk/queue"
 	"testing"
 	"time"
 )
