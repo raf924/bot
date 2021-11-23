@@ -26,7 +26,7 @@ func GetConnectorRelay(config cnf.Config) rpc.ConnectorRelay {
 }
 
 func GetConnectionRelay(config cnf.Config) rpc.ConnectionRelay {
-	for relayKey, relayConfig := range config.Bot {
+	for relayKey, relayConfig := range config.Connection {
 		relayBuilder := rpc.GetConnectionRelay(relayKey)
 		if relayBuilder != nil {
 			return relayBuilder(relayConfig)
