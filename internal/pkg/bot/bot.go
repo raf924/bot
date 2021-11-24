@@ -17,8 +17,6 @@ import (
 
 var _ pkg.Runnable = (*Bot)(nil)
 
-var Commands []command.Command
-
 type ban struct {
 	Start    time.Time     `json:"Start"`
 	Duration time.Duration `json:"Duration"`
@@ -28,7 +26,7 @@ type Bot struct {
 	connectorRelay           rpc.DispatcherRelay
 	users                    domain.UserList
 	loadedCommands           map[string]command.Command
-	commands                 []command.Command
+	commands                 command.List
 	config                   bot.Config
 	botUser                  *domain.User
 	bans                     map[string]ban
@@ -47,7 +45,7 @@ func NewBot(
 	userPermissionManager permissions.PermissionManager,
 	commandPermissionManager permissions.PermissionManager,
 	relay rpc.DispatcherRelay,
-	commands ...command.Command,
+	commands command.List,
 ) *Bot {
 	banStorage, err := storage.NewFileStorage(config.ApiKeys["banStorageLocation"])
 	if err != nil {
@@ -212,26 +210,28 @@ func (b *Bot) disable(cmd command.Command) {
 }
 
 func (b *Bot) initCommands() {
-	b.commands = append(b.commands, &builtinCommand{
+	b.commands.Add(&builtinCommand{
 		NoOpCommand: command.NoOpCommand{},
 		name:        "ban",
 		execute:     b.ban,
-	}, &builtinCommand{
+	})
+	b.commands.Add(&builtinCommand{
 		NoOpCommand: command.NoOpCommand{},
 		name:        "verify",
 		execute:     b.verify,
 	})
-	for _, cmd := range b.commands {
-		if b.isCommandDisabled(cmd) {
-			continue
+	b.commands.Range(func(command command.Command) bool {
+		if b.isCommandDisabled(command) {
+			return true
 		}
-		err := cmd.Init(b)
+		err := command.Init(b)
 		if err != nil {
-			log.Printf("couldn't init %s\n", cmd.Name())
-			b.disable(cmd)
+			log.Printf("couldn't init %s\n", command.Name())
+			b.disable(command)
 		}
-		b.AddCommand(cmd)
-	}
+		b.AddCommand(command)
+		return true
+	})
 }
 
 type FromUser interface {
