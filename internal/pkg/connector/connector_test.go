@@ -2,32 +2,24 @@ package connector
 
 import (
 	"context"
-	"fmt"
 	internalRpc "github.com/raf924/bot/v2/internal/pkg/rpc"
 	"github.com/raf924/bot/v2/pkg"
 	"github.com/raf924/bot/v2/pkg/config/connector"
 	"github.com/raf924/connector-sdk/domain"
-	"github.com/raf924/connector-sdk/queue"
+	"github.com/raf924/queue"
 	"testing"
 	"time"
 )
 
 type dummyConnection struct {
 	users                 domain.UserList
-	chatMessageConsumer   queue.Consumer
-	clientMessageProducer queue.Producer
+	chatMessageConsumer   queue.Consumer[*domain.ChatMessage]
+	clientMessageProducer queue.Producer[*domain.ClientMessage]
 	botUser               *domain.User
 }
 
 func (d *dummyConnection) Recv() (*domain.ChatMessage, error) {
-	consume, err := d.chatMessageConsumer.Consume()
-	if err != nil {
-		return nil, err
-	}
-	if _, ok := consume.(*domain.ChatMessage); !ok {
-		return nil, fmt.Errorf("")
-	}
-	return consume.(*domain.ChatMessage), nil
+	return d.chatMessageConsumer.Consume(context.Background())
 }
 
 func (d *dummyConnection) Send(message *domain.ClientMessage) error {
@@ -68,33 +60,24 @@ var _ pkg.Runnable = (*dummyRunnable)(nil)
 func TestConnector(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	clientMessageQueue := queue.NewQueue()
-	chatMessageQueue := queue.NewQueue()
-	serverMessageQueue := queue.NewQueue()
+	clientMessageQueue := queue.NewQueue[*domain.ClientMessage]()
+	chatMessageQueue := queue.NewQueue[*domain.ChatMessage]()
+	serverMessageQueue := queue.NewQueue[domain.ServerMessage]()
 	clientMessageConsumer, err := clientMessageQueue.NewConsumer()
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientMessageProducer, err := clientMessageQueue.NewProducer()
-	if err != nil {
-		t.Fatal(err)
-	}
+	clientMessageProducer := clientMessageQueue
 	chatMessageConsumer, err := chatMessageQueue.NewConsumer()
 	if err != nil {
 		t.Fatal(err)
 	}
-	chatMessageProducer, err := chatMessageQueue.NewProducer()
-	if err != nil {
-		t.Fatal(err)
-	}
+	chatMessageProducer := chatMessageQueue
 	serverMessageConsumer, err := serverMessageQueue.NewConsumer()
 	if err != nil {
 		t.Fatal(err)
 	}
-	serverMessageProducer, err := serverMessageQueue.NewProducer()
-	if err != nil {
-		t.Fatal(err)
-	}
+	serverMessageProducer := serverMessageQueue
 	botUser := domain.NewOnlineUser("bot", "id", domain.RegularUser, time.Now())
 	crRelay := internalRpc.NewDefaultConnectorRelay(
 		&dummyRunnable{ctx: ctx},
@@ -117,7 +100,7 @@ func TestConnector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	consume, err := serverMessageConsumer.Consume()
+	consume, err := serverMessageConsumer.Consume(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

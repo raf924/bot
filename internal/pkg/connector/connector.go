@@ -24,7 +24,7 @@ type Connector struct {
 	connectionRelay rpc.ConnectionRelay
 	relayServer     rpc.ConnectorRelay
 	context         context.Context
-	cancelFunc      context.CancelFunc
+	cancelFunc      func(err error)
 	users           domain.UserList
 }
 
@@ -68,8 +68,7 @@ func (c *Connector) getCommandOr(mP *domain.ChatMessage) domain.ServerMessage {
 		sort.Strings(names)
 		err := c.sendToConnection(domain.NewClientMessage(strings.Join(names, ", "), mP.Sender(), mP.Private()))
 		if err != nil {
-			log.Println(err)
-			c.cancelFunc()
+			c.cancelFunc(err)
 		}
 		return nil
 	}
@@ -82,7 +81,7 @@ func (c *Connector) getCommandOr(mP *domain.ChatMessage) domain.ServerMessage {
 }
 
 func (c *Connector) Start(ctx context.Context) error {
-	c.context, c.cancelFunc = context.WithCancel(ctx)
+	c.context, c.cancelFunc = pkg.Errorable(ctx)
 	c.connectionRelay.OnUserJoin(func(user *domain.User, timestamp time.Time) {
 		err := c.sendToDispatchers(domain.NewUserEvent(user, domain.UserJoined, timestamp))
 		if err != nil {
@@ -127,12 +126,12 @@ func (c *Connector) Start(ctx context.Context) error {
 		for c.Err() == nil {
 			dispatcher, err := c.relayServer.Accept()
 			if err != nil {
-				c.cancelFunc()
+				c.cancelFunc(err)
 				return
 			}
 			newUUID, err := ksuid.NewRandom()
 			if err != nil {
-				c.cancelFunc()
+				c.cancelFunc(err)
 				return
 			}
 			c.dispatchers.Store(newUUID.String(), dispatcher)
@@ -142,7 +141,7 @@ func (c *Connector) Start(ctx context.Context) error {
 		for c.Err() == nil {
 			mP, err := c.receiveFromConnection()
 			if err != nil {
-				c.cancelFunc()
+				c.cancelFunc(err)
 				return
 			}
 			m := c.getCommandOr(mP)
@@ -164,7 +163,7 @@ func (c *Connector) Start(ctx context.Context) error {
 			}
 			err = c.sendToConnection(packet)
 			if err != nil {
-				c.cancelFunc()
+				c.cancelFunc(err)
 				return
 			}
 		}

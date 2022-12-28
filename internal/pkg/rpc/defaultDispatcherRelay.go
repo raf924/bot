@@ -3,8 +3,8 @@ package rpc
 import (
 	"context"
 	"github.com/raf924/connector-sdk/domain"
-	"github.com/raf924/connector-sdk/queue"
 	"github.com/raf924/connector-sdk/rpc"
+	"github.com/raf924/queue"
 )
 
 type defaultDispatcherRelay struct {
@@ -12,8 +12,8 @@ type defaultDispatcherRelay struct {
 	onlineUsers           domain.UserList
 	trigger               string
 	currentUser           *domain.User
-	clientMessageProducer queue.Producer
-	serverMessageConsumer queue.Consumer
+	clientMessageProducer queue.Producer[*domain.ClientMessage]
+	serverMessageConsumer queue.Consumer[domain.ServerMessage]
 }
 
 func (d *defaultDispatcherRelay) Connect(*domain.RegistrationMessage) (*domain.ConfirmationMessage, error) {
@@ -25,11 +25,7 @@ func (d *defaultDispatcherRelay) Send(packet *domain.ClientMessage) error {
 }
 
 func (d *defaultDispatcherRelay) Recv() (domain.ServerMessage, error) {
-	consume, err := d.serverMessageConsumer.Consume()
-	if err != nil {
-		return nil, err
-	}
-	return consume.(domain.ServerMessage), nil
+	return d.serverMessageConsumer.Consume(d.ctx)
 }
 
 func (d *defaultDispatcherRelay) Done() <-chan struct{} {
@@ -42,7 +38,7 @@ func (d *defaultDispatcherRelay) Err() error {
 
 var _ rpc.DispatcherRelay = (*defaultDispatcherRelay)(nil)
 
-func NewDefaultDispatcherRelay(ctx context.Context, onlineUsers domain.UserList, trigger string, currentUser *domain.User, clientMessageProducer queue.Producer, serverMessageConsumer queue.Consumer) rpc.DispatcherRelay {
+func NewDefaultDispatcherRelay(ctx context.Context, onlineUsers domain.UserList, trigger string, currentUser *domain.User, clientMessageProducer queue.Producer[*domain.ClientMessage], serverMessageConsumer queue.Consumer[domain.ServerMessage]) rpc.DispatcherRelay {
 	return &defaultDispatcherRelay{
 		ctx:                   ctx,
 		onlineUsers:           onlineUsers,

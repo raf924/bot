@@ -33,10 +33,8 @@ type Bot struct {
 	userPermissionManager    permissions.PermissionManager
 	commandPermissionManager permissions.PermissionManager
 	ctx                      context.Context
-	err                      error
-	cancelFunc               context.CancelFunc
+	cancelFunc               func(err error)
 	banStorage               storage.Storage
-	errorChan                chan error
 	trigger                  string
 }
 
@@ -86,10 +84,7 @@ func (b *Bot) Done() <-chan struct{} {
 }
 
 func (b *Bot) Err() error {
-	if b.err == nil {
-		return b.ctx.Err()
-	}
-	return b.err
+	return b.ctx.Err()
 }
 
 func (b *Bot) BotUser() *domain.User {
@@ -101,21 +96,19 @@ func (b *Bot) ApiKeys() map[string]string {
 }
 
 func (b *Bot) Start(ctx context.Context) error {
-	b.ctx, b.cancelFunc = context.WithCancel(ctx)
+	b.ctx, b.cancelFunc = pkg.Errorable(ctx)
 	go func() {
 		select {
 		case <-b.connectorRelay.Done():
-			b.err = b.connectorRelay.Err()
-		case b.err = <-b.errorChan:
+			b.cancelFunc(fmt.Errorf("connector error: %w", b.connectorRelay.Err()))
 		}
-		b.cancelFunc()
 	}()
 	b.loadBans()
 	b.initCommands()
 	var err error
 	confirmation, err := b.connectorRelay.Connect(domain.NewRegistrationMessage(b.getCommandList()))
 	if err != nil {
-		return fmt.Errorf("cannot connect to server: %v", err)
+		return fmt.Errorf("cannot connect to server: %w", err)
 	}
 	b.botUser = confirmation.CurrentUser()
 	b.users = confirmation.Users()
@@ -125,18 +118,21 @@ func (b *Bot) Start(ctx context.Context) error {
 		loadedCommands: b.loadedCommands,
 		botUser:        b.botUser,
 		commandCallback: func(messages []*domain.ClientMessage, err error) error {
-			if b.err != nil {
-				return fmt.Errorf("bot is down: %v", b.err)
+			if b.ctx.Err() != nil {
+				return fmt.Errorf("bot is down: %v", b.ctx.Err())
 			}
 			if err != nil {
 				log.Println("error running command", err)
 				return nil
 			}
 			for _, message := range messages {
+				if b.ctx.Err() != nil {
+					return fmt.Errorf("bot is down: %v", b.ctx.Err())
+				}
 				go func(message *domain.ClientMessage) {
 					err := b.connectorRelay.Send(message)
 					if err != nil {
-						b.errorChan <- err
+						b.cancelFunc(err)
 					}
 				}(message)
 			}
@@ -146,10 +142,10 @@ func (b *Bot) Start(ctx context.Context) error {
 		commandPermissionManager: b.commandPermissionManager,
 	}
 	go func() {
-		for b.err == nil && b.ctx.Err() == nil {
+		for b.ctx.Err() == nil {
 			packet, err := b.connectorRelay.Recv()
 			if err != nil {
-				b.errorChan <- err
+				b.cancelFunc(err)
 				return
 			}
 			switch packet := packet.(type) {
@@ -167,7 +163,7 @@ func (b *Bot) Start(ctx context.Context) error {
 					senderIsBanned = b.isBanned(packet.Sender())
 				}
 				if err = commandHandler.PassServerMessage(packet, senderIsBanned); err != nil {
-					b.errorChan <- err
+					b.cancelFunc(err)
 					return
 				}
 			}()

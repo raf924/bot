@@ -3,14 +3,14 @@ package rpc
 import (
 	"context"
 	"github.com/raf924/connector-sdk/domain"
-	"github.com/raf924/connector-sdk/queue"
 	"github.com/raf924/connector-sdk/rpc"
+	"github.com/raf924/queue"
 )
 
 type defaultDispatcher struct {
 	ctx                   context.Context
 	commands              domain.CommandList
-	serverMessageProducer queue.Producer
+	serverMessageProducer queue.Producer[domain.ServerMessage]
 }
 
 func (d *defaultDispatcher) Dispatch(message domain.ServerMessage) error {
