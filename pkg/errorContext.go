@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"context"
+	"fmt"
 )
 
 type ErrorContext struct {
@@ -20,7 +21,7 @@ func (e *ErrorContext) Err() error {
 	if e.parentCtx == nil {
 		return e.err
 	}
-	return e.parentCtx.Err()
+	return fmt.Errorf("parent context was cancelled: %w", e.parentCtx.Err())
 }
 
 var _ context.Context = (*ErrorContext)(nil)
